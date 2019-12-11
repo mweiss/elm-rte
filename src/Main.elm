@@ -5,73 +5,28 @@
 --
 
 
-port module Main exposing (tryIncomingPort, tryKeyPress, tryOutgoingPort)
+port module Main exposing (tryIncomingPort, tryKeyPress, tryOutgoingPort, updateSelectionState)
 
 import Browser
 import Browser.Dom
 import Browser.Events
 import Debug as Debug
 import Html exposing (Html, button, div, text)
-import Html.Attributes exposing (attribute, contenteditable)
+import Html.Attributes exposing (attribute, contenteditable, id, style)
 import Html.Events exposing (on, onBlur, onClick)
 import Html.Keyed exposing (node)
 import Json.Decode as D
 import Json.Encode as E
+import Model exposing (CharacterMetadata, CharacterStyle, Document, DocumentNode, DocumentNodeType, Keypress, Selection)
 import Random
 import Set exposing (Set)
+import String.Extra exposing (insertAt)
 import Task
 import Uuid exposing (Uuid, uuidGenerator)
 
 
 main =
     Browser.element { init = init, view = view, update = update, subscriptions = subscribe }
-
-
-type alias Selection =
-    { anchorOffset : Int
-    , anchorNode : String
-    , focusOffset : Int
-    , focusNode : String
-    , isCollapsed : Bool
-    , rangeCount : Int
-    , selectionType : String
-    }
-
-
-type alias Keypress =
-    { keyCode : Int
-    , key : String
-    }
-
-
-type alias Document =
-    { id : String
-    , idCounter : Int
-    , nodes : List DocumentNode
-    }
-
-
-type DocumentNodeType
-    = Paragraph
-    | Header
-
-
-type alias DocumentNode =
-    { id : String
-    , characterMetadata : CharacterMetadata
-    , text : String
-    , nodeType : String
-    }
-
-
-type CharacterStyle
-    = Bold
-    | Italic
-
-
-type alias CharacterMetadata =
-    { styles : Set CharacterStyle
-    }
 
 
 selectionDecoder : D.Decoder Selection
@@ -96,6 +51,9 @@ keyPressDecoder =
 port tryOutgoingPort : String -> Cmd m
 
 
+port updateSelectionState : Selection -> Cmd m
+
+
 port tryIncomingPort : (E.Value -> msg) -> Sub msg
 
 
@@ -110,13 +68,9 @@ type alias Model =
     Document
 
 
-type UuidTest
-    = UuidTestV Int
-
-
 initialDocumentNodes : List DocumentNode
 initialDocumentNodes =
-    [ DocumentNode "0" (CharacterMetadata Set.empty) "test text" "" ]
+    [ DocumentNode "documentNode0" (CharacterMetadata Set.empty) "test text" "" ]
 
 
 
@@ -125,7 +79,7 @@ initialDocumentNodes =
 
 initialDocument : Document
 initialDocument =
-    Document "" 1 initialDocumentNodes
+    Document "" 1 initialDocumentNodes Nothing
 
 
 init : () -> ( Model, Cmd Msg )
@@ -187,6 +141,69 @@ updateOnRandom uuid model =
     ( { model | id = Uuid.toString uuid }, Cmd.none )
 
 
+
+-- TODO parse selection in Elm instead of JS
+
+
+updateOnSelection : E.Value -> Model -> ( Model, Cmd Msg )
+updateOnSelection selectionValue model =
+    let
+        selection =
+            Debug.log "Test selection" (D.decodeValue selectionDecoder selectionValue)
+    in
+    case selection of
+        Err err ->
+            Debug.log "Error parsing selection!" ( model, Cmd.none )
+
+        Ok s ->
+            ( { model | selection = Just s }, Cmd.none )
+
+
+mapDocument : (DocumentNode -> DocumentNode) -> Document -> Document
+mapDocument fn document =
+    { document | nodes = List.map fn document.nodes }
+
+
+insertIfSelected : Selection -> String -> DocumentNode -> DocumentNode
+insertIfSelected selection s node =
+    if selection.focusNode == node.id then
+        { node | text = insertAt s selection.focusOffset node.text }
+
+    else
+        node
+
+
+updateOnKeyPress : E.Value -> Model -> ( Model, Cmd Msg )
+updateOnKeyPress keypressValue model =
+    let
+        keyPress =
+            Debug.log "Testing incoming port" (D.decodeValue keyPressDecoder keypressValue)
+    in
+    case keyPress of
+        Err err ->
+            Debug.log "Error parsing key press" ( model, Cmd.none )
+
+        Ok keypress ->
+            -- TODO: handle all cases
+            case model.selection of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just selection ->
+                    let
+                        td =
+                            mapDocument (insertIfSelected selection keypress.key) model
+
+                        newSel =
+                            { selection | focusOffset = selection.focusOffset + 1, anchorOffset = selection.anchorOffset + 1 }
+
+                        -- TODO make length correct instead of +1
+                        newDoc =
+                            { td | selection = Just newSel }
+                    in
+                    ( newDoc, updateSelectionState newSel )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -209,18 +226,10 @@ update msg model =
             ( model, tryOutgoingPort "blur" )
 
         SelectionEvent v ->
-            let
-                t =
-                    Debug.log "Testing incoming port" (D.decodeValue selectionDecoder v)
-            in
-            ( model, tryOutgoingPort "test" )
+            updateOnSelection v model
 
         KeyPressEvent v ->
-            let
-                t =
-                    Debug.log "Testing incoming port" (D.decodeValue keyPressDecoder v)
-            in
-            ( model, tryOutgoingPort "test" )
+            updateOnKeyPress v model
 
         _ ->
             ( model, tryOutgoingPort "test" )
@@ -239,6 +248,29 @@ view model =
     renderDocument model
 
 
+selectionAttributesIfPresent : Maybe Selection -> List (Html.Attribute Msg)
+selectionAttributesIfPresent s =
+    case s of
+        Nothing ->
+            []
+
+        Just selection ->
+            [ attribute "focus-offset" (String.fromInt selection.focusOffset)
+            , attribute "anchor-offset" (String.fromInt selection.anchorOffset)
+            , attribute "anchor-node" selection.anchorNode
+            , attribute "focus-node" selection.focusNode
+            , attribute "is-collapsed"
+                (if selection.isCollapsed then
+                    "true"
+
+                 else
+                    "false"
+                )
+            , attribute "range-count" (String.fromInt selection.rangeCount)
+            , attribute "selection-type" selection.selectionType
+            ]
+
+
 renderDocument : Document -> Html Msg
 renderDocument document =
     node "div"
@@ -249,11 +281,15 @@ renderDocument document =
                 , doOnBlur
                 , onBeforeInput
                 , onKeyDown
+                , style "display" "inline-block"
                 , onCompositionEnd
                 , attribute "data-rte" "true"
                 , attribute "data-document-id" document.id
                 ]
                 (List.map renderDocumentNode document.nodes)
+          )
+        , ( "selection_test"
+          , node "selection-state" (selectionAttributesIfPresent document.selection) []
           )
         ]
 
@@ -261,9 +297,10 @@ renderDocument document =
 renderDocumentNode : DocumentNode -> ( String, Html Msg )
 renderDocumentNode documentNode =
     ( documentNode.id
-    , div
-        [ attribute "data-document-node-id" documentNode.id ]
-        [ text documentNode.text ]
+    , node "div"
+        [ id documentNode.id, attribute "data-document-node-id" documentNode.id ]
+        [ ( "bs", text documentNode.text ) ]
+      -- TODO: this doesn't need to be a keyed node
     )
 
 
