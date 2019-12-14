@@ -15,9 +15,16 @@ class SelectionState extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     const focusOffset = Number(this.getAttribute("focus-offset"));
     const focusNode = this.getAttribute("focus-node");
+    const anchorOffset = Number(this.getAttribute("anchor-offset"));
+    const anchorNode = this.getAttribute("anchor-node");
 
     if (focusNode) {
-      expectedSelectionState = {focusNode: focusNode, focusOffset: focusOffset};
+      expectedSelectionState = {
+        focusNode: focusNode,
+        focusOffset: focusOffset,
+        anchorOffset: anchorOffset,
+        anchorNode: anchorNode
+      };
       updateSelectionToExpected();
     }
   }
@@ -47,11 +54,12 @@ const updateSelectionToExpected = () => {
   if (expectedSelectionState) {
     const data = expectedSelectionState;
     expectedSelectionState = null;
-    // TODO: Right now this only handles caret
-    const textNode = document.getElementById(data.focusNode).childNodes[0];
-    console.log("setting position", data.focusOffset, textNode);
+    const focusNode = document.getElementById(data.focusNode).childNodes[0];
+    const anchorNode = document.getElementById(data.anchorNode).childNodes[0];
+
+    console.log(data);
     const sel = window.getSelection();
-    sel.collapse(textNode, data.focusOffset);
+    sel.setBaseAndExtent(anchorNode, data.anchorOffset, focusNode, data.focusOffset)
   }
 
 };

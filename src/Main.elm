@@ -7,6 +7,7 @@
 
 port module Main exposing (tryIncomingPort, tryKeyPress, tryOutgoingPort, updateSelectionState)
 
+import BasicEditor exposing (editorView)
 import Browser
 import Browser.Dom
 import Browser.Events
@@ -17,7 +18,7 @@ import Html.Events exposing (on, onBlur, onClick)
 import Html.Keyed exposing (node)
 import Json.Decode as D
 import Json.Encode as E
-import Model exposing (CharacterMetadata, CharacterStyle, Document, DocumentNode, DocumentNodeType, Keypress, Selection)
+import Model exposing (CharacterMetadata, CharacterStyle, Document, DocumentNode, DocumentNodeType, Keypress, Msg(..), Selection)
 import Random
 import Set exposing (Set)
 import String.Extra exposing (insertAt)
@@ -89,27 +90,6 @@ init s =
 
 
 -- UPDATE
-
-
-type Msg
-    = OnBeforeInput String
-    | Init
-    | OnRandom Uuid
-    | OnBlur
-    | OnCompositionStart
-    | OnCopy
-    | OnCut
-    | OnDragOver
-    | OnDragStart
-    | OnFocus
-    | OnInput
-    | OnPaste
-    | OnSelect
-    | OnKeyDown String
-    | OnCompositionEnd String
-    | Noop
-    | SelectionEvent E.Value
-    | KeyPressEvent E.Value
 
 
 beforeInputDecoder =
@@ -231,6 +211,9 @@ update msg model =
         KeyPressEvent v ->
             updateOnKeyPress v model
 
+        OnButtonPress v ->
+            ( Debug.log v model, tryOutgoingPort "obp" )
+
         _ ->
             ( model, tryOutgoingPort "test" )
 
@@ -245,7 +228,7 @@ doOnBlur =
 
 view : Model -> Html Msg
 view model =
-    renderDocument model
+    div [] [ editorView model, renderDocument model ]
 
 
 selectionAttributesIfPresent : Maybe Selection -> List (Html.Attribute Msg)

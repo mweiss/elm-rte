@@ -1,6 +1,8 @@
 module Model exposing (..)
 
+import Json.Encode as E
 import Set exposing (Set)
+import Uuid exposing (Uuid)
 
 
 type alias Selection =
@@ -49,3 +51,25 @@ type CharacterStyle
 type alias CharacterMetadata =
     { styles : Set CharacterStyle
     }
+
+
+type Msg
+    = OnBeforeInput String
+    | Init
+    | OnRandom Uuid
+    | OnBlur
+    | OnCompositionStart
+    | OnCopy
+    | OnCut
+    | OnDragOver
+    | OnDragStart
+    | OnFocus
+    | OnInput
+    | OnPaste
+    | OnSelect
+    | OnKeyDown String
+    | OnCompositionEnd String
+    | Noop
+    | SelectionEvent E.Value
+    | KeyPressEvent E.Value
+    | OnButtonPress String
