@@ -5,25 +5,26 @@
 --
 
 
-port module Main exposing (tryIncomingPort, tryKeyPress, tryOutgoingPort, updateSelectionState)
+port module Main exposing (tryIncomingPort, tryKeyPress, tryOutgoingPort)
 
 import BasicEditor exposing (editorView)
 import Browser
-import Browser.Dom
-import Browser.Events
 import Debug as Debug
-import Html exposing (Html, button, div, text)
+import DocumentNodeToEditorNode exposing (..)
+import EditorNodeToHtml exposing (..)
+import Html exposing (Html, div, node)
 import Html.Attributes exposing (attribute, contenteditable, id, style)
-import Html.Events exposing (on, onBlur, onClick)
-import Html.Keyed exposing (node)
+import Html.Events exposing (on, onBlur)
 import Json.Decode as D
 import Json.Encode as E
-import Model exposing (CharacterMetadata, CharacterStyle, Document, DocumentNode, DocumentNodeType, Keypress, Msg(..), Selection)
+import List exposing (drop, repeat, take)
+import Model exposing (CharacterMetadata, CharacterStyle, Document, DocumentNode, DocumentNodeType, Keypress, Msg(..), Selection, emptyCharacterMetadata)
 import Random
 import Set exposing (Set)
+import String exposing (length)
 import String.Extra exposing (insertAt)
 import Task
-import Uuid exposing (Uuid, uuidGenerator)
+import Uuid exposing (Uuid)
 
 
 main =
@@ -52,9 +53,6 @@ keyPressDecoder =
 port tryOutgoingPort : String -> Cmd m
 
 
-port updateSelectionState : Selection -> Cmd m
-
-
 port tryIncomingPort : (E.Value -> msg) -> Sub msg
 
 
@@ -69,9 +67,14 @@ type alias Model =
     Document
 
 
+initialText : String
+initialText =
+    "test text"
+
+
 initialDocumentNodes : List DocumentNode
 initialDocumentNodes =
-    [ DocumentNode "documentNode0" (CharacterMetadata Set.empty) "test text" "" ]
+    [ DocumentNode "documentNode0" (repeat (length initialText) emptyCharacterMetadata) initialText "" ]
 
 
 
@@ -80,7 +83,7 @@ initialDocumentNodes =
 
 initialDocument : Document
 initialDocument =
-    Document "" 1 initialDocumentNodes Nothing
+    Document "" 1 initialDocumentNodes Nothing (CharacterMetadata Set.empty)
 
 
 init : () -> ( Model, Cmd Msg )
@@ -144,10 +147,13 @@ mapDocument fn document =
     { document | nodes = List.map fn document.nodes }
 
 
-insertIfSelected : Selection -> String -> DocumentNode -> DocumentNode
-insertIfSelected selection s node =
-    if selection.focusNode == node.id then
-        { node | text = insertAt s selection.focusOffset node.text }
+insertIfSelected : Selection -> CharacterMetadata -> String -> DocumentNode -> DocumentNode
+insertIfSelected selection cm s node =
+    if String.startsWith node.id selection.focusNode then
+        { node
+            | text = insertAt s selection.focusOffset node.text
+            , characterMetadata = take selection.focusOffset node.characterMetadata ++ repeat (length s) cm ++ drop selection.focusOffset node.characterMetadata
+        }
 
     else
         node
@@ -172,7 +178,7 @@ updateOnKeyPress keypressValue model =
                 Just selection ->
                     let
                         td =
-                            mapDocument (insertIfSelected selection keypress.key) model
+                            mapDocument (insertIfSelected selection model.currentStyles keypress.key) model
 
                         newSel =
                             { selection | focusOffset = selection.focusOffset + 1, anchorOffset = selection.anchorOffset + 1 }
@@ -181,7 +187,7 @@ updateOnKeyPress keypressValue model =
                         newDoc =
                             { td | selection = Just newSel }
                     in
-                    ( newDoc, updateSelectionState newSel )
+                    ( newDoc, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -212,10 +218,48 @@ update msg model =
             updateOnKeyPress v model
 
         OnButtonPress v ->
-            ( Debug.log v model, tryOutgoingPort "obp" )
+            updateOnButtonPress v model
 
         _ ->
             ( model, tryOutgoingPort "test" )
+
+
+updateOnButtonPress : String -> Model -> ( Model, Cmd Msg )
+updateOnButtonPress buttonValue model =
+    case buttonValue of
+        "Bold" ->
+            ( { model | currentStyles = toggleStyle model.currentStyles buttonValue }, Cmd.none )
+
+        _ ->
+            ( model, Cmd.none )
+
+
+toggleStyle : CharacterMetadata -> CharacterStyle -> CharacterMetadata
+toggleStyle characterMetadata characterStyle =
+    { characterMetadata
+        | styles =
+            if Set.member characterStyle characterMetadata.styles then
+                Set.remove characterStyle characterMetadata.styles
+
+            else
+                Set.insert characterStyle characterMetadata.styles
+    }
+
+
+
+-- Update the current style and current selection
+
+
+updateStyle : CharacterStyle -> Model -> ( Model, Cmd Msg )
+updateStyle characterStyle model =
+    let
+        newCurrentStyles =
+            toggleStyle model.currentStyles characterStyle
+
+        newModel =
+            { model | currentStyles = newCurrentStyles }
+    in
+    ( newModel, Cmd.none )
 
 
 
@@ -254,37 +298,28 @@ selectionAttributesIfPresent s =
             ]
 
 
+renderDocumentNodeToHtml : DocumentNode -> Html Msg
+renderDocumentNodeToHtml =
+    editorNodeToHtml << documentNodeToEditorNode
+
+
 renderDocument : Document -> Html Msg
 renderDocument document =
-    node "div"
+    div
         []
-        [ ( document.id
-          , node "div"
-                [ contenteditable True
-                , doOnBlur
-                , onBeforeInput
-                , onKeyDown
-                , style "display" "inline-block"
-                , onCompositionEnd
-                , attribute "data-rte" "true"
-                , attribute "data-document-id" document.id
-                ]
-                (List.map renderDocumentNode document.nodes)
-          )
-        , ( "selection_test"
-          , node "selection-state" (selectionAttributesIfPresent document.selection) []
-          )
+        [ div
+            [ contenteditable True
+            , doOnBlur
+            , onBeforeInput
+            , onKeyDown
+            , style "display" "inline-block"
+            , onCompositionEnd
+            , attribute "data-rte" "true"
+            , attribute "data-document-id" document.id
+            ]
+            (List.map renderDocumentNodeToHtml document.nodes)
+        , node "selection-state" (selectionAttributesIfPresent document.selection) []
         ]
-
-
-renderDocumentNode : DocumentNode -> ( String, Html Msg )
-renderDocumentNode documentNode =
-    ( documentNode.id
-    , node "div"
-        [ id documentNode.id, attribute "data-document-node-id" documentNode.id ]
-        [ ( "bs", text documentNode.text ) ]
-      -- TODO: this doesn't need to be a keyed node
-    )
 
 
 

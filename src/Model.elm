@@ -1,8 +1,24 @@
 module Model exposing (..)
 
+import Dict exposing (Dict)
 import Json.Encode as E
 import Set exposing (Set)
 import Uuid exposing (Uuid)
+
+
+type EditorNode
+    = BlockEditorNode
+        { id : String
+        , childNodes : List EditorNode
+        , styles : Dict String String
+        , nodeType : String
+        }
+    | LeafEditorNode
+        { offset : Int
+        , styles : Dict String String
+        , text : String
+        , id : String
+        }
 
 
 type alias Selection =
@@ -27,6 +43,7 @@ type alias Document =
     , idCounter : Int
     , nodes : List DocumentNode
     , selection : Maybe Selection
+    , currentStyles : CharacterMetadata
     }
 
 
@@ -37,20 +54,24 @@ type DocumentNodeType
 
 type alias DocumentNode =
     { id : String
-    , characterMetadata : CharacterMetadata
+    , characterMetadata : List CharacterMetadata
     , text : String
     , nodeType : String
     }
 
 
-type CharacterStyle
-    = Bold
-    | Italic
+type alias CharacterStyle =
+    String
 
 
 type alias CharacterMetadata =
     { styles : Set CharacterStyle
     }
+
+
+emptyCharacterMetadata : CharacterMetadata
+emptyCharacterMetadata =
+    { styles = Set.empty }
 
 
 type Msg

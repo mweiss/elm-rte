@@ -50,39 +50,64 @@ app.ports.tryOutgoingPort.subscribe(function(data) {
 let isChromium = !! window.chrome;
 let expectedSelectionState = null;
 
+
+const offsetAndNode = (node, offset) => {
+  let prevNode = null;
+  let prevOffset = 0;
+  for (let childNode of node.childNodes) {
+    if (childNode.dataset && childNode.dataset.documentNodeOffset) {
+      let childOffset = Number(childNode.dataset.documentNodeOffset);
+      if (childOffset > offset) {
+        break;
+      }
+      prevOffset = childOffset;
+      prevNode = childNode
+    }
+  }
+
+  if (prevNode && prevNode.childNodes && prevNode.childNodes[0]) {
+    return {node: prevNode.childNodes[0], offset: offset - prevOffset}
+  }
+};
+
 const updateSelectionToExpected = () => {
   if (expectedSelectionState) {
     const data = expectedSelectionState;
     expectedSelectionState = null;
-    const focusNode = document.getElementById(data.focusNode).childNodes[0];
-    const anchorNode = document.getElementById(data.anchorNode).childNodes[0];
+    const focusNode = document.getElementById(data.focusNode);
+    const anchorNode = document.getElementById(data.anchorNode);
 
-    console.log(data);
+    if (!focusNode || !anchorNode) {
+      return
+    }
+
+    let focusData = offsetAndNode(focusNode, data.focusOffset);
+    let anchorData = offsetAndNode(anchorNode, data.anchorOffset);
+
+    if (!focusData || !anchorData) {
+      return
+    }
     const sel = window.getSelection();
-    sel.setBaseAndExtent(anchorNode, data.anchorOffset, focusNode, data.focusOffset)
+    sel.setBaseAndExtent(anchorData.node, anchorData.offset, focusData.node, focusData.offset)
   }
 
 };
 
-app.ports.updateSelectionState.subscribe(function(data) {
-  /*
-  console.log('ports.updateSelectionState')
-  expectedSelectionState = data;
-  if (isChromium) {
-    updateSelectionToExpected()
-  }
-  */
-});
-
 
 const findDocumentNodeId = (node) => {
+  let offset = 0;
+  let id = "";
   while (node && node.tagName !== "BODY") {
+    if (node.dataset && node.dataset.documentNodeOffset) {
+      offset = Number(node.dataset.documentNodeOffset)
+    }
     if (node.dataset && node.dataset.documentNodeId) {
-      return node.dataset.documentNodeId
+      id = node.dataset.documentNodeId;
+      break;
     }
     node = node.parentNode
   }
-  return ""
+  return {offset, id}
 };
 
 document.addEventListener("selectionchange", (e) => {
@@ -91,15 +116,14 @@ document.addEventListener("selectionchange", (e) => {
   const anchorNode = findDocumentNodeId(selection.anchorNode);
   const focusNode = findDocumentNodeId(selection.focusNode);
 
-
   app.ports.tryIncomingPort.send({
-    "anchorOffset": selection.anchorOffset,
-    "focusOffset": selection.focusOffset,
+    "anchorOffset": selection.anchorOffset + anchorNode.offset,
+    "focusOffset": selection.focusOffset + focusNode.offset,
     "isCollapsed": selection.isCollapsed,
     "rangeCount": selection.rangeCount,
     "type": selection.type,
-    "anchorNode": anchorNode,
-    "focusNode": focusNode
+    "anchorNode": anchorNode.id,
+    "focusNode": focusNode.id
   });
 });
 
