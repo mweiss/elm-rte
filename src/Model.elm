@@ -35,6 +35,9 @@ type alias Selection =
 type alias Keypress =
     { keyCode : Int
     , key : String
+    , altKey : Bool
+    , metaKey : Bool
+    , ctrlKey : Bool
     }
 
 
@@ -92,5 +95,5 @@ type Msg
     | OnCompositionEnd String
     | Noop
     | SelectionEvent E.Value
-    | KeyPressEvent E.Value
+    | KeyDownEvent E.Value
     | OnButtonPress String

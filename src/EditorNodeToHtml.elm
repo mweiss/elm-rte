@@ -1,8 +1,14 @@
 module EditorNodeToHtml exposing (..)
 
+import Dict exposing (Dict, toList)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Model exposing (..)
+
+
+editorNodeStyles : Dict String String -> List (Attribute msg)
+editorNodeStyles styles =
+    List.map (\( k, v ) -> style k v) (toList styles)
 
 
 editorNodeToHtml : EditorNode -> Html msg
@@ -14,13 +20,6 @@ editorNodeToHtml editorNode =
                 (List.map editorNodeToHtml node.childNodes)
 
         LeafEditorNode node ->
-            let
-                leafEditorNodeId =
-                    String.concat [ node.id, "-", String.fromInt node.offset ]
-            in
             Html.span
-                [ id (String.concat [ leafEditorNodeId ])
-                , attribute "data-document-node-offset" (String.fromInt node.offset)
-                , attribute "data-document-node-offset-id" leafEditorNodeId
-                ]
+                ([ attribute "data-document-node-offset" (String.fromInt node.offset) ] ++ editorNodeStyles node.styles)
                 [ Html.text node.text ]

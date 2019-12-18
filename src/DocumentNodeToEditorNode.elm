@@ -1,8 +1,9 @@
 module DocumentNodeToEditorNode exposing (..)
 
 import Array
-import Dict exposing (Dict)
+import Dict exposing (Dict, insert)
 import Model exposing (..)
+import Set exposing (..)
 
 
 
@@ -56,9 +57,19 @@ foldCharactersWithSameMetadata ( char, metadata ) agg =
 -- TODO: implement me!
 
 
+characterMetadataFunc : String -> Dict String String -> Dict String String
+characterMetadataFunc style dict =
+    case style of
+        "Bold" ->
+            Dict.insert "font-weight" "bold" dict
+
+        _ ->
+            dict
+
+
 characterMetadataToStyles : CharacterMetadata -> Dict String String
 characterMetadataToStyles characterMetadata =
-    Dict.empty
+    Set.foldl characterMetadataFunc Dict.empty characterMetadata.styles
 
 
 charactersToNodes : String -> ( String, CharacterMetadata ) -> Array.Array EditorNode -> Array.Array EditorNode

@@ -5,16 +5,17 @@
 --
 
 
-port module Main exposing (tryIncomingPort, tryKeyPress, tryOutgoingPort)
+port module Main exposing (tryIncomingPort, tryKeyDown, tryOutgoingPort)
 
 import BasicEditor exposing (editorView)
 import Browser
 import Debug as Debug
 import DocumentNodeToEditorNode exposing (..)
 import EditorNodeToHtml exposing (..)
+import HandleBeforeInput exposing (handleBeforeInput, onBeforeInput)
 import Html exposing (Html, div, node)
 import Html.Attributes exposing (attribute, contenteditable, id, style)
-import Html.Events exposing (on, onBlur)
+import Html.Events exposing (on, onBlur, preventDefaultOn)
 import Json.Decode as D
 import Json.Encode as E
 import List exposing (drop, repeat, take)
@@ -22,7 +23,6 @@ import Model exposing (CharacterMetadata, CharacterStyle, Document, DocumentNode
 import Random
 import Set exposing (Set)
 import String exposing (length)
-import String.Extra exposing (insertAt)
 import Task
 import Uuid exposing (Uuid)
 
@@ -43,20 +43,13 @@ selectionDecoder =
         (D.field "type" D.string)
 
 
-keyPressDecoder : D.Decoder Keypress
-keyPressDecoder =
-    D.map2 Keypress
-        (D.field "keyCode" D.int)
-        (D.field "key" D.string)
-
-
 port tryOutgoingPort : String -> Cmd m
 
 
 port tryIncomingPort : (E.Value -> msg) -> Sub msg
 
 
-port tryKeyPress : (E.Value -> msg) -> Sub msg
+port tryKeyDown : (E.Value -> msg) -> Sub msg
 
 
 
@@ -95,20 +88,18 @@ init s =
 -- UPDATE
 
 
-beforeInputDecoder =
-    D.at [ "data" ] (D.map OnBeforeInput D.string)
+alwaysPreventDefault : msg -> ( msg, Bool )
+alwaysPreventDefault msg =
+    ( msg, True )
 
 
-onBeforeInput =
-    on "beforeinput" beforeInputDecoder
-
-
+keyDownDecoder : D.Decoder ( Msg, Bool )
 keyDownDecoder =
-    D.at [ "keyCode" ] (D.map OnKeyDown D.string)
+    D.map alwaysPreventDefault (D.at [ "keyCode" ] (D.map OnKeyDown D.string))
 
 
 onKeyDown =
-    on "keydown" keyDownDecoder
+    preventDefaultOn "keydown" keyDownDecoder
 
 
 compositionEndDecoder =
@@ -142,54 +133,6 @@ updateOnSelection selectionValue model =
             ( { model | selection = Just s }, Cmd.none )
 
 
-mapDocument : (DocumentNode -> DocumentNode) -> Document -> Document
-mapDocument fn document =
-    { document | nodes = List.map fn document.nodes }
-
-
-insertIfSelected : Selection -> CharacterMetadata -> String -> DocumentNode -> DocumentNode
-insertIfSelected selection cm s node =
-    if String.startsWith node.id selection.focusNode then
-        { node
-            | text = insertAt s selection.focusOffset node.text
-            , characterMetadata = take selection.focusOffset node.characterMetadata ++ repeat (length s) cm ++ drop selection.focusOffset node.characterMetadata
-        }
-
-    else
-        node
-
-
-updateOnKeyPress : E.Value -> Model -> ( Model, Cmd Msg )
-updateOnKeyPress keypressValue model =
-    let
-        keyPress =
-            Debug.log "Testing incoming port" (D.decodeValue keyPressDecoder keypressValue)
-    in
-    case keyPress of
-        Err err ->
-            Debug.log "Error parsing key press" ( model, Cmd.none )
-
-        Ok keypress ->
-            -- TODO: handle all cases
-            case model.selection of
-                Nothing ->
-                    ( model, Cmd.none )
-
-                Just selection ->
-                    let
-                        td =
-                            mapDocument (insertIfSelected selection model.currentStyles keypress.key) model
-
-                        newSel =
-                            { selection | focusOffset = selection.focusOffset + 1, anchorOffset = selection.anchorOffset + 1 }
-
-                        -- TODO make length correct instead of +1
-                        newDoc =
-                            { td | selection = Just newSel }
-                    in
-                    ( newDoc, Cmd.none )
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -199,11 +142,8 @@ update msg model =
         OnRandom uuid ->
             updateOnRandom uuid model
 
-        OnBeforeInput s ->
-            ( Debug.log "Testing debug message before input" model, tryOutgoingPort "bi" )
-
-        OnKeyDown s ->
-            ( Debug.log "Testing debug message keydown" model, tryOutgoingPort "kd" )
+        OnBeforeInput data ->
+            Debug.log ("on before input" ++ data) (handleBeforeInput data model)
 
         OnCompositionEnd s ->
             ( Debug.log "Testing debug message composition end" model, tryOutgoingPort "ke" )
@@ -214,9 +154,8 @@ update msg model =
         SelectionEvent v ->
             updateOnSelection v model
 
-        KeyPressEvent v ->
-            updateOnKeyPress v model
-
+        -- KeyDownEvent v ->
+        --     handleKeyDown v model
         OnButtonPress v ->
             updateOnButtonPress v model
 
@@ -328,4 +267,4 @@ renderDocument document =
 
 subscribe : Model -> Sub Msg
 subscribe model =
-    Sub.batch [ tryIncomingPort SelectionEvent, tryKeyPress KeyPressEvent ]
+    Sub.batch [ tryIncomingPort SelectionEvent, tryKeyDown KeyDownEvent ]

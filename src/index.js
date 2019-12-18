@@ -70,12 +70,18 @@ const offsetAndNode = (node, offset) => {
   }
 };
 
+const selectDocumentNodeById = (id) => {
+  return document.querySelector(`[data-document-node-id="${id}"]`)
+};
+
 const updateSelectionToExpected = () => {
   if (expectedSelectionState) {
     const data = expectedSelectionState;
     expectedSelectionState = null;
-    const focusNode = document.getElementById(data.focusNode);
-    const anchorNode = document.getElementById(data.anchorNode);
+
+    // TODO: limit this just to within the document by making it aware of the document id
+    const focusNode = selectDocumentNodeById(data.focusNode);
+    const anchorNode = selectDocumentNodeById(data.anchorNode);
 
     if (!focusNode || !anchorNode) {
       return
@@ -127,9 +133,11 @@ document.addEventListener("selectionchange", (e) => {
   });
 });
 
-document.addEventListener("keypress", (e) => {
+
+/*document.addEventListener("keydown", (e) => {
   e.preventDefault();
   console.log(e);
-  app.ports.tryKeyPress.send(e)
+  app.ports.tryKeyDown.send(e)
 });
 
+*/
