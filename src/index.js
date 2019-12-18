@@ -1,6 +1,7 @@
 import './main.css';
 import { Elm } from './Main.elm';
 import * as serviceWorker from './serviceWorker';
+import {keys} from "./keys";
 
 console.log('testing');
 
@@ -133,11 +134,18 @@ document.addEventListener("selectionchange", (e) => {
   });
 });
 
-
-/*document.addEventListener("keydown", (e) => {
-  e.preventDefault();
-  console.log(e);
-  app.ports.tryKeyDown.send(e)
+document.addEventListener("keydown", (e) => {
+  switch(e.key) {
+    case "Backspace":
+    case "Delete":
+    case "Tab":
+    case "Enter":
+    case "Return":
+      e.preventDefault();
+      console.log(e);
+      app.ports.tryKeyDown.send(e);
+      break;
+    default:
+      // Do nothing.
+  }
 });
-
-*/

@@ -13,6 +13,7 @@ import Debug as Debug
 import DocumentNodeToEditorNode exposing (..)
 import EditorNodeToHtml exposing (..)
 import HandleBeforeInput exposing (handleBeforeInput, onBeforeInput)
+import HandleKeyDown exposing (handleKeyDown)
 import Html exposing (Html, div, node)
 import Html.Attributes exposing (attribute, contenteditable, id, style)
 import Html.Events exposing (on, onBlur, preventDefaultOn)
@@ -142,8 +143,8 @@ update msg model =
         OnRandom uuid ->
             updateOnRandom uuid model
 
-        OnBeforeInput data ->
-            Debug.log ("on before input" ++ data) (handleBeforeInput data model)
+        OnBeforeInput value ->
+            Debug.log "on before input" (handleBeforeInput value model)
 
         OnCompositionEnd s ->
             ( Debug.log "Testing debug message composition end" model, tryOutgoingPort "ke" )
@@ -154,8 +155,9 @@ update msg model =
         SelectionEvent v ->
             updateOnSelection v model
 
-        -- KeyDownEvent v ->
-        --     handleKeyDown v model
+        KeyDownEvent v ->
+            handleKeyDown v model
+
         OnButtonPress v ->
             updateOnButtonPress v model
 

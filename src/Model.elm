@@ -77,8 +77,12 @@ emptyCharacterMetadata =
     { styles = Set.empty }
 
 
+type alias BeforeInput =
+    { data : String, isComposing : Bool, inputType : String }
+
+
 type Msg
-    = OnBeforeInput String
+    = OnBeforeInput BeforeInput
     | Init
     | OnRandom Uuid
     | OnBlur

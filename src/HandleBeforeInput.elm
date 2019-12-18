@@ -3,11 +3,19 @@ module HandleBeforeInput exposing (..)
 import DocumentUtils exposing (insertIfSelected, mapDocument)
 import Html.Events exposing (preventDefaultOn)
 import Json.Decode as D
-import Model exposing (Document, Msg(..))
+import Model exposing (BeforeInput, Document, Msg(..))
 
 
+beforeInputDecoder : D.Decoder ( Msg, Bool )
 beforeInputDecoder =
-    D.map alwaysPreventDefault (D.at [ "data" ] (D.map OnBeforeInput D.string))
+    D.map alwaysPreventDefault
+        (D.map OnBeforeInput
+            (D.map3 BeforeInput
+                (D.field "data" D.string)
+                (D.field "isComposing" D.bool)
+                (D.field "inputType" D.string)
+            )
+        )
 
 
 onBeforeInput =
@@ -23,9 +31,8 @@ alwaysPreventDefault msg =
     ( msg, True )
 
 
-handleBeforeInput : String -> Document -> ( Document, Cmd Msg )
-handleBeforeInput data model =
-    -- TODO: handle all cases
+handleBeforeInput : BeforeInput -> Document -> ( Document, Cmd Msg )
+handleBeforeInput beforeInput model =
     case model.selection of
         Nothing ->
             ( model, Cmd.none )
@@ -33,7 +40,7 @@ handleBeforeInput data model =
         Just selection ->
             let
                 td =
-                    mapDocument (insertIfSelected selection model.currentStyles data) model
+                    mapDocument (insertIfSelected selection model.currentStyles beforeInput.data) model
 
                 newSel =
                     { selection | focusOffset = selection.focusOffset + 1, anchorOffset = selection.anchorOffset + 1 }

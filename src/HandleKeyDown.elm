@@ -23,6 +23,22 @@ keyDownDecoder =
 
 -- Handle key codes
 -- RETURN, DELETE, TAB, BACKSPACE, UP, DOWN, LEFT, RIGHT, SHIFT, CAPSLOCK, ALT, OPTION, COMMAND, CTRL,
+-- TODO: implement me!
+
+
+handleEnter : Document -> Selection -> ( Document, Cmd Msg )
+handleEnter model selection =
+    ( model, Cmd.none )
+
+
+handleTab : Document -> Selection -> ( Document, Cmd Msg )
+handleTab model selection =
+    ( model, Cmd.none )
+
+
+handleBackspace : Document -> Selection -> ( Document, Cmd Msg )
+handleBackspace model selection =
+    ( model, Cmd.none )
 
 
 handleKeyDown : E.Value -> Document -> ( Document, Cmd Msg )
@@ -42,15 +58,21 @@ handleKeyDown keypressValue model =
                     ( model, Cmd.none )
 
                 Just selection ->
-                    let
-                        td =
-                            mapDocument (insertIfSelected selection model.currentStyles keypress.key) model
+                    case keypress.key of
+                        "Backspace" ->
+                            handleBackspace model selection
 
-                        newSel =
-                            { selection | focusOffset = selection.focusOffset + 1, anchorOffset = selection.anchorOffset + 1 }
+                        "Delete" ->
+                            handleBackspace model selection
 
-                        -- TODO make length correct instead of +1
-                        newDoc =
-                            { td | selection = Just newSel }
-                    in
-                    ( newDoc, Cmd.none )
+                        "Tab" ->
+                            handleTab model selection
+
+                        "Enter" ->
+                            handleEnter model selection
+
+                        "Return" ->
+                            handleEnter model selection
+
+                        _ ->
+                            ( model, Cmd.none )
