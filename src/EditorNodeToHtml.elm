@@ -28,5 +28,9 @@ editorNodeToHtml editorNode =
 
         LeafEditorNode node ->
             Html.span
-                ([ attribute "data-document-node-offset" (String.fromInt node.offset) ] ++ editorNodeStyles node.styles)
+                ([ attribute "data-document-node-offset" (String.fromInt node.offset)
+                 , style "white-space" "pre-wrap"
+                 ]
+                    ++ editorNodeStyles node.styles
+                )
                 [ Html.text node.text ]

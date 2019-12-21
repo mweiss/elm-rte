@@ -1,8 +1,10 @@
 module DocumentUtils exposing (..)
 
+import DeleteWord
 import List exposing (drop, repeat, take)
 import List.Extra
 import Model exposing (..)
+import Regex
 import String exposing (length)
 import String.Extra exposing (insertAt)
 
@@ -429,9 +431,61 @@ backspace selection document =
         removeSelected selection document
 
 
+backspaceWordCollapsed : String -> Int -> Document -> Document
+backspaceWordCollapsed nodeId offset document =
+    if offset == 0 then
+        backspaceCollapsed nodeId offset document
+
+    else
+        let
+            ( before, selected, after ) =
+                getSelectionSingleBlock nodeId document.nodes
+        in
+        case List.head selected of
+            -- invalid state, TODO (can I prevent this?)
+            Nothing ->
+                document
+
+            Just selectedNode ->
+                let
+                    matches =
+                        Regex.findAtMost 1 DeleteWord.backspaceWordRegex selectedNode.text
+
+                    matchOffset =
+                        case List.head matches of
+                            Nothing ->
+                                0
+
+                            Just match ->
+                                match.index
+
+                    newNode =
+                        removeRange matchOffset offset selectedNode
+
+                    newNodes =
+                        before ++ [ newNode ] ++ after
+
+                    newSelection =
+                        Just
+                            { anchorOffset = matchOffset
+                            , anchorNode = newNode.id
+                            , focusOffset = matchOffset
+                            , focusNode = newNode.id
+                            , isCollapsed = True
+                            , rangeCount = 0
+                            , selectionType = "Caret"
+                            }
+                in
+                { document | nodes = newNodes, selection = newSelection }
+
+
 backspaceWord : Selection -> Document -> Document
 backspaceWord selection document =
-    document
+    if selection.isCollapsed then
+        backspaceWordCollapsed selection.anchorNode selection.anchorOffset document
+
+    else
+        removeSelected selection document
 
 
 backspaceToBeginningOfLine : Selection -> Document -> Document

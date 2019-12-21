@@ -1,7 +1,7 @@
 module HandleKeyDown exposing (handleKeyDown)
 
 import Debug as Debug
-import DocumentUtils exposing (backspace, delete, insertIfSelected, mapDocument, splitBlock)
+import DocumentUtils exposing (backspace, backspaceWord, delete, insertIfSelected, mapDocument, splitBlock)
 import Json.Decode as D
 import Json.Encode as E
 import List exposing (drop, repeat, take)
@@ -45,6 +45,11 @@ handleBackspace model selection =
     ( backspace selection model, Cmd.none )
 
 
+handleBackspaceWord : Document -> Selection -> ( Document, Cmd Msg )
+handleBackspaceWord model selection =
+    ( backspaceWord selection model, Cmd.none )
+
+
 handleDelete : Document -> Selection -> ( Document, Cmd Msg )
 handleDelete model selection =
     ( delete selection model, Cmd.none )
@@ -69,7 +74,11 @@ handleKeyDown keypressValue model =
                 Just selection ->
                     case keypress.key of
                         "Backspace" ->
-                            handleBackspace model selection
+                            if keypress.ctrlKey then
+                                handleBackspaceWord model selection
+
+                            else
+                                handleBackspace model selection
 
                         "Delete" ->
                             handleDelete model selection
