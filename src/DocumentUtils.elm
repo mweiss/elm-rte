@@ -1,8 +1,7 @@
 module DocumentUtils exposing (..)
 
-import Array exposing (Array)
 import List exposing (drop, repeat, take)
-import List.Extra exposing (selectSplit)
+import List.Extra
 import Model exposing (..)
 import String exposing (length)
 import String.Extra exposing (insertAt)
@@ -178,7 +177,66 @@ splitSelectSingle newId selection documentNodes =
 
 delete : Selection -> Document -> Document
 delete selection document =
-    document
+    if selection.isCollapsed then
+        deleteCollapsed selection.anchorNode selection.anchorOffset document
+
+    else
+        removeSelected selection document
+
+
+deleteCollapsed : String -> Int -> Document -> Document
+deleteCollapsed nodeId offset document =
+    let
+        ( before, selected, after ) =
+            getSelectionSingleBlock nodeId document.nodes
+    in
+    case List.head selected of
+        -- invalid state, TODO (can I prevent this?)
+        Nothing ->
+            document
+
+        Just selectedNode ->
+            let
+                ( newNodeList, newSelection ) =
+                    if offset == String.length selectedNode.text then
+                        case List.head after of
+                            Nothing ->
+                                ( document.nodes, document.selection )
+
+                            Just nextNode ->
+                                let
+                                    newText =
+                                        selectedNode.text ++ nextNode.text
+
+                                    newCharacterMetadata =
+                                        selectedNode.characterMetadata ++ nextNode.characterMetadata
+                                in
+                                ( before ++ [ { nextNode | text = newText, characterMetadata = newCharacterMetadata } ] ++ List.take (List.length after - 1) after
+                                , Just
+                                    { anchorOffset = length selectedNode.text
+                                    , anchorNode = nextNode.id
+                                    , focusOffset = length selectedNode.text
+                                    , focusNode = nextNode.id
+                                    , isCollapsed = True
+                                    , rangeCount = 0
+                                    , selectionType = "Caret"
+                                    }
+                                )
+
+                    else
+                        ( before ++ [ removeRange offset (offset + 1) selectedNode ] ++ after
+                        , Just
+                            { anchorOffset = offset
+                            , anchorNode = selectedNode.id
+                            , focusOffset = offset
+                            , focusNode = selectedNode.id
+                            , isCollapsed = True
+                            , rangeCount = 0
+                            , selectionType = "Caret"
+                            }
+                        )
+            in
+            { document | nodes = newNodeList, selection = newSelection }
 
 
 deleteWord : Selection -> Document -> Document
@@ -428,19 +486,3 @@ splitBlock selection document =
         , selection = Just newSelection
         , idCounter = document.idCounter + 1
     }
-
-
-
--- TODO: Implement me
-
-
-splitBlockAtSelection : Document -> Document
-splitBlockAtSelection document =
-    case
-        document.selection
-    of
-        Nothing ->
-            document
-
-        Just selection ->
-            splitBlock selection document
