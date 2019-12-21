@@ -168,6 +168,219 @@ splitSelectSingle newId selection documentNodes =
             ]
 
 
+
+-- Run through the cases
+-- Delete collapsed
+-- Delete selection
+-- Delete word
+-- Delete line
+
+
+delete : Selection -> Document -> Document
+delete selection document =
+    document
+
+
+deleteWord : Selection -> Document -> Document
+deleteWord selection document =
+    document
+
+
+deleteToEndOfBlock : Selection -> Document -> Document
+deleteToEndOfBlock selection document =
+    document
+
+
+removeRange : Int -> Int -> DocumentNode -> DocumentNode
+removeRange start end documentNode =
+    let
+        newText =
+            String.left start documentNode.text ++ String.dropLeft end documentNode.text
+
+        newCharacterMetadata =
+            List.take start documentNode.characterMetadata ++ List.drop end documentNode.characterMetadata
+    in
+    { documentNode | text = newText, characterMetadata = newCharacterMetadata }
+
+
+backspaceCollapsed : String -> Int -> Document -> Document
+backspaceCollapsed nodeId offset document =
+    let
+        ( before, selected, after ) =
+            getSelectionSingleBlock nodeId document.nodes
+    in
+    case List.head selected of
+        -- invalid state, TODO (can I prevent this?)
+        Nothing ->
+            document
+
+        Just selectedNode ->
+            let
+                ( newNodeList, newSelection ) =
+                    if offset == 0 then
+                        case List.Extra.last before of
+                            Nothing ->
+                                ( document.nodes, document.selection )
+
+                            Just prevNode ->
+                                let
+                                    newText =
+                                        prevNode.text ++ selectedNode.text
+
+                                    newCharacterMetadata =
+                                        prevNode.characterMetadata ++ selectedNode.characterMetadata
+                                in
+                                ( List.take (List.length before - 1) before ++ [ { prevNode | text = newText, characterMetadata = newCharacterMetadata } ] ++ after
+                                , Just
+                                    { anchorOffset = length prevNode.text
+                                    , anchorNode = prevNode.id
+                                    , focusOffset = length prevNode.text
+                                    , focusNode = prevNode.id
+                                    , isCollapsed = True
+                                    , rangeCount = 0
+                                    , selectionType = "Caret"
+                                    }
+                                )
+
+                    else
+                        ( before ++ [ removeRange (offset - 1) offset selectedNode ] ++ after
+                        , Just
+                            { anchorOffset = offset - 1
+                            , anchorNode = selectedNode.id
+                            , focusOffset = offset - 1
+                            , focusNode = selectedNode.id
+                            , isCollapsed = True
+                            , rangeCount = 0
+                            , selectionType = "Caret"
+                            }
+                        )
+            in
+            { document | nodes = newNodeList, selection = newSelection }
+
+
+removeSelected : Selection -> Document -> Document
+removeSelected selection document =
+    let
+        ( before, selected, after ) =
+            getSelectionBlocks selection document.nodes
+    in
+    case List.length selected of
+        -- TODO: Invalid state?
+        0 ->
+            document
+
+        -- Remove selected text
+        1 ->
+            case List.head selected of
+                -- TODO: Invalid state?
+                Nothing ->
+                    document
+
+                Just selectedNode ->
+                    let
+                        minOffset =
+                            min selection.focusOffset selection.anchorOffset
+
+                        maxOffset =
+                            max selection.focusOffset selection.anchorOffset
+
+                        newNodes =
+                            before ++ [ removeRange minOffset maxOffset selectedNode ] ++ after
+
+                        newSelection =
+                            Just
+                                { anchorOffset = minOffset
+                                , anchorNode = selectedNode.id
+                                , focusOffset = minOffset
+                                , focusNode = selectedNode.id
+                                , isCollapsed = True
+                                , rangeCount = 0
+                                , selectionType = "Caret"
+                                }
+                    in
+                    { document | nodes = newNodes, selection = newSelection }
+
+        -- Remove across multiple nodes
+        _ ->
+            case List.head selected of
+                -- TODO: Invalid state, is there a better way?
+                Nothing ->
+                    document
+
+                Just selectedStart ->
+                    case List.Extra.last selected of
+                        Nothing ->
+                            document
+
+                        Just selectedEnd ->
+                            let
+                                offsetStart =
+                                    if selectedStart.id == selection.anchorNode then
+                                        selection.anchorOffset
+
+                                    else
+                                        selection.focusOffset
+
+                                offsetEnd =
+                                    if selectedEnd.id == selection.anchorNode then
+                                        selection.anchorOffset
+
+                                    else
+                                        selection.focusOffset
+
+                                newText =
+                                    String.left offsetStart selectedStart.text ++ String.dropLeft offsetEnd selectedEnd.text
+
+                                newCharacterMetadata =
+                                    List.take offsetStart selectedStart.characterMetadata ++ List.drop offsetEnd selectedEnd.characterMetadata
+
+                                newNode =
+                                    { selectedStart | text = newText, characterMetadata = newCharacterMetadata }
+
+                                newNodes =
+                                    before ++ [ newNode ] ++ after
+
+                                newSelection =
+                                    Just
+                                        { anchorOffset = offsetStart
+                                        , anchorNode = newNode.id
+                                        , focusOffset = offsetStart
+                                        , focusNode = newNode.id
+                                        , isCollapsed = True
+                                        , rangeCount = 0
+                                        , selectionType = "Caret"
+                                        }
+                            in
+                            { document
+                                | nodes = newNodes
+                                , selection = newSelection
+                            }
+
+
+
+-- Backspace collapsed
+-- Delete selection
+
+
+backspace : Selection -> Document -> Document
+backspace selection document =
+    if selection.isCollapsed then
+        backspaceCollapsed selection.anchorNode selection.anchorOffset document
+
+    else
+        removeSelected selection document
+
+
+backspaceWord : Selection -> Document -> Document
+backspaceWord selection document =
+    document
+
+
+backspaceToBeginningOfLine : Selection -> Document -> Document
+backspaceToBeginningOfLine selection document =
+    document
+
+
 splitBlock : Selection -> Document -> Document
 splitBlock selection document =
     let
@@ -187,7 +400,7 @@ splitBlock selection document =
                     document.nodes
 
                 1 ->
-                    splitSelectSingle (document.id ++ String.fromInt newIdCounter) selection selected
+                    splitSelectSingle (document.id ++ "-" ++ String.fromInt newIdCounter) selection selected
 
                 _ ->
                     splitSelectedRange selection selected

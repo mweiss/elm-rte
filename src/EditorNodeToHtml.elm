@@ -17,7 +17,14 @@ editorNodeToHtml editorNode =
         BlockEditorNode node ->
             Html.div
                 [ id node.id, attribute "data-document-node-id" node.id ]
-                (List.map editorNodeToHtml node.childNodes)
+                (if List.isEmpty node.childNodes then
+                    [ Html.span [ attribute "data-document-node-offset" "0" ] [ Html.text "" ]
+                    , Html.br [] []
+                    ]
+
+                 else
+                    List.map editorNodeToHtml node.childNodes
+                )
 
         LeafEditorNode node ->
             Html.span

@@ -1,7 +1,7 @@
 module HandleKeyDown exposing (handleKeyDown)
 
 import Debug as Debug
-import DocumentUtils exposing (insertIfSelected, mapDocument)
+import DocumentUtils exposing (backspace, insertIfSelected, mapDocument, splitBlock)
 import Json.Decode as D
 import Json.Encode as E
 import List exposing (drop, repeat, take)
@@ -28,7 +28,11 @@ keyDownDecoder =
 
 handleEnter : Document -> Selection -> ( Document, Cmd Msg )
 handleEnter model selection =
-    ( model, Cmd.none )
+    let
+        newModel =
+            splitBlock selection model
+    in
+    ( newModel, Cmd.none )
 
 
 handleTab : Document -> Selection -> ( Document, Cmd Msg )
@@ -38,6 +42,11 @@ handleTab model selection =
 
 handleBackspace : Document -> Selection -> ( Document, Cmd Msg )
 handleBackspace model selection =
+    ( backspace selection model, Cmd.none )
+
+
+handleDelete : Document -> Selection -> ( Document, Cmd Msg )
+handleDelete model selection =
     ( model, Cmd.none )
 
 
@@ -63,7 +72,7 @@ handleKeyDown keypressValue model =
                             handleBackspace model selection
 
                         "Delete" ->
-                            handleBackspace model selection
+                            handleDelete model selection
 
                         "Tab" ->
                             handleTab model selection

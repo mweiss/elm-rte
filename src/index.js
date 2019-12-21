@@ -3,9 +3,6 @@ import { Elm } from './Main.elm';
 import * as serviceWorker from './serviceWorker';
 import {keys} from "./keys";
 
-console.log('testing');
-
-
 // Testing web component -- will probably need polymer to use correctly
 class SelectionState extends HTMLElement {
   static get observedAttributes() {
@@ -19,7 +16,8 @@ class SelectionState extends HTMLElement {
     const anchorOffset = Number(this.getAttribute("anchor-offset"));
     const anchorNode = this.getAttribute("anchor-node");
 
-    if (focusNode) {
+    console.log('values', focusOffset, focusNode, anchorOffset, anchorNode);
+    if (focusNode && anchorNode) {
       expectedSelectionState = {
         focusNode: focusNode,
         focusOffset: focusOffset,
@@ -95,7 +93,15 @@ const updateSelectionToExpected = () => {
       return
     }
     const sel = window.getSelection();
-    sel.setBaseAndExtent(anchorData.node, anchorData.offset, focusData.node, focusData.offset)
+    try {
+      sel.setBaseAndExtent(anchorData.node, anchorData.offset, focusData.node, focusData.offset)
+    } catch (e) {
+      // TODO: look into why selection state is sometimes incorrect
+      console.log("Uh oh, the selection state was incorrect!" +
+          "This maybe happens because attributes are stale on the web component?");
+      console.log("Test data", anchorData.node, anchorData.offset, focusData.node, focusData.offset);
+      console.log("Test data2", data, focusData, anchorData);
+    }
   }
 
 };
@@ -123,6 +129,7 @@ document.addEventListener("selectionchange", (e) => {
   const anchorNode = findDocumentNodeId(selection.anchorNode);
   const focusNode = findDocumentNodeId(selection.focusNode);
 
+  console.log("selection change", selection.focusNode, selection.focusOffset, selection.anchorNode, selection.anchorOffset);
   app.ports.tryIncomingPort.send({
     "anchorOffset": selection.anchorOffset + anchorNode.offset,
     "focusOffset": selection.focusOffset + focusNode.offset,
@@ -142,7 +149,6 @@ document.addEventListener("keydown", (e) => {
     case "Enter":
     case "Return":
       e.preventDefault();
-      console.log(e);
       app.ports.tryKeyDown.send(e);
       break;
     default:
