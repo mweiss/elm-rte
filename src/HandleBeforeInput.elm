@@ -1,6 +1,6 @@
 module HandleBeforeInput exposing (..)
 
-import DocumentUtils exposing (insertIfSelected, mapDocument)
+import DocumentUtils exposing (insertAtSelection, insertIfSelected, mapDocument)
 import Html.Events exposing (preventDefaultOn)
 import Json.Decode as D
 import Model exposing (BeforeInput, Document, Msg(..))
@@ -31,21 +31,16 @@ alwaysPreventDefault msg =
     ( msg, True )
 
 
+
+-- Handle insertion cases
+-- on composition
+-- when range is selected
+
+
 handleBeforeInput : BeforeInput -> Document -> ( Document, Cmd Msg )
 handleBeforeInput beforeInput model =
-    case model.selection of
-        Nothing ->
-            ( model, Cmd.none )
+    if beforeInput.isComposing then
+        ( model, Cmd.none )
 
-        Just selection ->
-            let
-                td =
-                    mapDocument (insertIfSelected selection model.currentStyles beforeInput.data) model
-
-                newSel =
-                    { selection | focusOffset = selection.focusOffset + 1, anchorOffset = selection.anchorOffset + 1 }
-
-                newDoc =
-                    { td | selection = Just newSel }
-            in
-            ( newDoc, Cmd.none )
+    else
+        ( insertAtSelection beforeInput.data model, Cmd.none )

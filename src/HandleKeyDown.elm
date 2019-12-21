@@ -77,29 +77,33 @@ handleKeyDown keypressValue model =
                     ( model, Cmd.none )
 
                 Just selection ->
-                    case keypress.key of
-                        "Backspace" ->
-                            if keypress.ctrlKey then
-                                handleBackspaceWord model selection
+                    if model.isComposing then
+                        ( model, Cmd.none )
 
-                            else
-                                handleBackspace model selection
+                    else
+                        case keypress.key of
+                            "Backspace" ->
+                                if keypress.ctrlKey then
+                                    handleBackspaceWord model selection
 
-                        "Delete" ->
-                            if keypress.ctrlKey then
-                                handleDeleteWord model selection
+                                else
+                                    handleBackspace model selection
 
-                            else
-                                handleDelete model selection
+                            "Delete" ->
+                                if keypress.ctrlKey then
+                                    handleDeleteWord model selection
 
-                        "Tab" ->
-                            handleTab model selection
+                                else
+                                    handleDelete model selection
 
-                        "Enter" ->
-                            handleEnter model selection
+                            "Tab" ->
+                                handleTab model selection
 
-                        "Return" ->
-                            handleEnter model selection
+                            "Enter" ->
+                                handleEnter model selection
 
-                        _ ->
-                            ( model, Cmd.none )
+                            "Return" ->
+                                handleEnter model selection
+
+                            _ ->
+                                ( model, Cmd.none )

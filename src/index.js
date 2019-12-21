@@ -16,7 +16,6 @@ class SelectionState extends HTMLElement {
     const anchorOffset = Number(this.getAttribute("anchor-offset"));
     const anchorNode = this.getAttribute("anchor-node");
 
-    console.log('values', focusOffset, focusNode, anchorOffset, anchorNode);
     if (focusNode && anchorNode) {
       expectedSelectionState = {
         focusNode: focusNode,
@@ -41,7 +40,6 @@ const app = Elm.Main.init({
 serviceWorker.unregister();
 
 app.ports.tryOutgoingPort.subscribe(function(data) {
-  console.log('try port', data)
 });
 
 // TODO: use browser check library, or just don't do browser checks
@@ -129,7 +127,6 @@ document.addEventListener("selectionchange", (e) => {
   const anchorNode = findDocumentNodeId(selection.anchorNode);
   const focusNode = findDocumentNodeId(selection.focusNode);
 
-  console.log("selection change", selection.focusNode, selection.focusOffset, selection.anchorNode, selection.anchorOffset);
   app.ports.tryIncomingPort.send({
     "anchorOffset": selection.anchorOffset + anchorNode.offset,
     "focusOffset": selection.focusOffset + focusNode.offset,

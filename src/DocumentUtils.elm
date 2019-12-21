@@ -592,3 +592,26 @@ splitBlock selection document =
         , selection = Just newSelection
         , idCounter = document.idCounter + 1
     }
+
+
+insertAtSelection : String -> Document -> Document
+insertAtSelection value document =
+    case document.selection of
+        Nothing ->
+            document
+
+        Just selection ->
+            let
+                dataLength =
+                    String.length value
+
+                td =
+                    mapDocument (insertIfSelected selection document.currentStyles value) document
+
+                newSel =
+                    { selection | focusOffset = selection.focusOffset + dataLength, anchorOffset = selection.anchorOffset + dataLength }
+
+                newDoc =
+                    { td | selection = Just newSel }
+            in
+            newDoc

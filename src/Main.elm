@@ -13,6 +13,8 @@ import Debug as Debug
 import DocumentNodeToEditorNode exposing (..)
 import EditorNodeToHtml exposing (..)
 import HandleBeforeInput exposing (handleBeforeInput, onBeforeInput)
+import HandleCompositionEnd exposing (handleCompositionEnd)
+import HandleCompositionStart exposing (handleCompositionStart)
 import HandleKeyDown exposing (handleKeyDown)
 import Html exposing (Html, div, node)
 import Html.Attributes exposing (attribute, contenteditable, id, style)
@@ -71,13 +73,9 @@ initialDocumentNodes =
     [ DocumentNode "documentNode0" (repeat (length initialText) emptyCharacterMetadata) initialText "" ]
 
 
-
--- Random.generate OnRandom Uuid.uuidGenerator
-
-
 initialDocument : Document
 initialDocument =
-    Document "" 1 initialDocumentNodes Nothing (CharacterMetadata Set.empty)
+    Document "" 1 initialDocumentNodes Nothing (CharacterMetadata Set.empty) False
 
 
 init : () -> ( Model, Cmd Msg )
@@ -111,6 +109,10 @@ onCompositionEnd =
     on "compositionend" compositionEndDecoder
 
 
+onCompositionStart =
+    on "compositionstart" (D.succeed OnCompositionStart)
+
+
 updateOnRandom : Uuid -> Model -> ( Model, Cmd Msg )
 updateOnRandom uuid model =
     ( { model | id = Uuid.toString uuid }, Cmd.none )
@@ -122,16 +124,20 @@ updateOnRandom uuid model =
 
 updateOnSelection : E.Value -> Model -> ( Model, Cmd Msg )
 updateOnSelection selectionValue model =
-    let
-        selection =
-            Debug.log "Test selection" (D.decodeValue selectionDecoder selectionValue)
-    in
-    case selection of
-        Err err ->
-            Debug.log "Error parsing selection!" ( model, Cmd.none )
+    if model.isComposing then
+        ( model, Cmd.none )
 
-        Ok s ->
-            ( { model | selection = Just s }, Cmd.none )
+    else
+        let
+            selection =
+                D.decodeValue selectionDecoder selectionValue
+        in
+        case selection of
+            Err err ->
+                Debug.log "Error parsing selection!" ( model, Cmd.none )
+
+            Ok s ->
+                ( { model | selection = Just s }, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -146,8 +152,11 @@ update msg model =
         OnBeforeInput value ->
             Debug.log "on before input" (handleBeforeInput value model)
 
+        OnCompositionStart ->
+            Debug.log "composition start" (handleCompositionStart model)
+
         OnCompositionEnd s ->
-            ( Debug.log "Testing debug message composition end" model, tryOutgoingPort "ke" )
+            Debug.log "composition end" (handleCompositionEnd s model)
 
         OnBlur ->
             ( model, tryOutgoingPort "blur" )
@@ -156,7 +165,7 @@ update msg model =
             updateOnSelection v model
 
         KeyDownEvent v ->
-            handleKeyDown v model
+            Debug.log "keydown" (handleKeyDown v model)
 
         OnButtonPress v ->
             updateOnButtonPress v model
@@ -255,6 +264,7 @@ renderDocument document =
             , onKeyDown
             , style "display" "inline-block"
             , onCompositionEnd
+            , onCompositionStart
             , attribute "data-rte" "true"
             , attribute "data-document-id" document.id
             ]

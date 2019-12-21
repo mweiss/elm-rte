@@ -47,6 +47,7 @@ type alias Document =
     , nodes : List DocumentNode
     , selection : Maybe Selection
     , currentStyles : CharacterMetadata
+    , isComposing : Bool
     }
 
 
