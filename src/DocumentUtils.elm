@@ -243,7 +243,59 @@ deleteCollapsed nodeId offset document =
 
 deleteWord : Selection -> Document -> Document
 deleteWord selection document =
-    document
+    if selection.isCollapsed then
+        deleteWordCollapsed selection.anchorNode selection.anchorOffset document
+
+    else
+        removeSelected selection document
+
+
+deleteWordCollapsed : String -> Int -> Document -> Document
+deleteWordCollapsed nodeId offset document =
+    let
+        ( before, selected, after ) =
+            getSelectionSingleBlock nodeId document.nodes
+    in
+    case List.head selected of
+        -- invalid state, TODO (can I prevent this?)
+        Nothing ->
+            document
+
+        Just selectedNode ->
+            if offset == String.length selectedNode.text then
+                deleteCollapsed nodeId offset document
+
+            else
+                let
+                    matches =
+                        Regex.findAtMost 1 DeleteWord.deleteWordRegex (String.dropLeft offset selectedNode.text)
+
+                    matchOffset =
+                        case List.head matches of
+                            Nothing ->
+                                0
+
+                            Just match ->
+                                String.length match.match + offset
+
+                    newNode =
+                        removeRange offset matchOffset selectedNode
+
+                    newNodes =
+                        before ++ [ newNode ] ++ after
+
+                    newSelection =
+                        Just
+                            { anchorOffset = offset
+                            , anchorNode = newNode.id
+                            , focusOffset = offset
+                            , focusNode = newNode.id
+                            , isCollapsed = True
+                            , rangeCount = 0
+                            , selectionType = "Caret"
+                            }
+                in
+                { document | nodes = newNodes, selection = newSelection }
 
 
 deleteToEndOfBlock : Selection -> Document -> Document
@@ -449,7 +501,7 @@ backspaceWordCollapsed nodeId offset document =
             Just selectedNode ->
                 let
                     matches =
-                        Regex.findAtMost 1 DeleteWord.backspaceWordRegex selectedNode.text
+                        Regex.findAtMost 1 DeleteWord.backspaceWordRegex (String.left offset selectedNode.text)
 
                     matchOffset =
                         case List.head matches of
