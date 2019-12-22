@@ -170,6 +170,9 @@ update msg model =
         OnButtonPress v ->
             updateOnButtonPress v model
 
+        Noop ->
+            Debug.log "noop" ( model, Cmd.none )
+
         _ ->
             ( model, tryOutgoingPort "test" )
 
@@ -253,6 +256,10 @@ renderDocumentNodeToHtml =
     editorNodeToHtml << documentNodeToEditorNode
 
 
+onTestEvent =
+    on "testevent" (D.succeed Noop)
+
+
 renderDocument : Document -> Html Msg
 renderDocument document =
     div
@@ -261,6 +268,7 @@ renderDocument document =
             [ contenteditable True
             , doOnBlur
             , onBeforeInput
+            , onTestEvent
             , onKeyDown
             , style "display" "inline-block"
             , onCompositionEnd

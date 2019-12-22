@@ -469,11 +469,6 @@ removeSelected selection document =
                             }
 
 
-
--- Backspace collapsed
--- Delete selection
-
-
 backspace : Selection -> Document -> Document
 backspace selection document =
     if selection.isCollapsed then

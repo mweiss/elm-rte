@@ -44,7 +44,6 @@ app.ports.tryOutgoingPort.subscribe(function(data) {
 
 // TODO: use browser check library, or just don't do browser checks
 // This is so bad to store this, but it's here so I can test delaying the function
-let isChromium = !! window.chrome;
 let expectedSelectionState = null;
 
 
@@ -139,6 +138,21 @@ document.addEventListener("selectionchange", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
+  let node = e.target;
+
+  let documentId;
+  while (node && node.tagName !== "BODY") {
+    if (node.dataset && node.dataset.documentId) {
+      documentId = node.dataset.documentId;
+      break;
+    }
+    node = node.parentNode
+  }
+
+  if (!documentId) {
+    return;
+  }
+
   switch(e.key) {
     case "Backspace":
     case "Delete":
@@ -152,3 +166,32 @@ document.addEventListener("keydown", (e) => {
       // Do nothing.
   }
 });
+
+// Firefox does not support beforeinput, so let's create a synthetic beforeinput event
+const IS_FIREFOX = typeof InstallTrigger !== 'undefined';
+if (IS_FIREFOX) {
+  let isComposing = false;
+  document.addEventListener("compositionstart", (e) => {
+    isComposing = true
+  });
+
+  document.addEventListener("compositionend", (e) => {
+    isComposing = false;
+  });
+
+  document.addEventListener("keypress", (e) => {
+    let node = e.target;
+    while (node && node.tagName !== "BODY") {
+      if (node.dataset && node.dataset.documentId) {
+        let event = new InputEvent("beforeinput", {
+          data: e.key,
+          isComposing: isComposing,
+          inputType: "insertText"
+        });
+        node.dispatchEvent(event);
+        break;
+      }
+      node = node.parentNode
+    }
+  });
+}

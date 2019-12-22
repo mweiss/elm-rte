@@ -1,6 +1,5 @@
 module HandleCompositionStart exposing (..)
 
-import DocumentUtils exposing (insertAtSelection)
 import Model exposing (Document, Msg)
 
 
