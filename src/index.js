@@ -75,7 +75,6 @@ const updateSelectionToExpected = () => {
     const data = expectedSelectionState;
     expectedSelectionState = null;
 
-    // TODO: limit this just to within the document by making it aware of the document id
     const focusNode = selectDocumentNodeById(data.focusNode);
     const anchorNode = selectDocumentNodeById(data.anchorNode);
 
@@ -188,7 +187,10 @@ if (IS_FIREFOX) {
           isComposing: isComposing,
           inputType: "insertText"
         });
-        node.dispatchEvent(event);
+        let preventDefault = node.dispatchEvent(event);
+        if (preventDefault) {
+          e.preventDefault()
+        }
         break;
       }
       node = node.parentNode

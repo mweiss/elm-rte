@@ -370,6 +370,137 @@ backspaceCollapsed nodeId offset document =
             { document | nodes = newNodeList, selection = newSelection }
 
 
+replaceSelected : List DocumentNode -> Selection -> Document -> Document
+replaceSelected replaceNodes selection document =
+    let
+        ( before, selected, after ) =
+            getSelectionBlocks selection document.nodes
+    in
+    if List.length selected > 1 then
+        let
+            removedDocument =
+                removeSelected selection document
+        in
+        case removedDocument.selection of
+            Nothing ->
+                document
+
+            Just newSelection ->
+                replaceSelected replaceNodes newSelection removedDocument
+
+    else
+        case List.head selected of
+            Nothing ->
+                document
+
+            Just selectedNode ->
+                let
+                    minOffset =
+                        min selection.focusOffset selection.anchorOffset
+
+                    maxOffset =
+                        max selection.focusOffset selection.anchorOffset
+
+                    ( newNodes, newSelection ) =
+                        replaceRange replaceNodes selectedNode minOffset maxOffset
+                in
+                { document | nodes = before ++ newNodes ++ after, selection = Just newSelection }
+
+
+
+-- handle case where list is one
+
+
+replaceRange : List DocumentNode -> DocumentNode -> Int -> Int -> ( List DocumentNode, Selection )
+replaceRange newDocumentNodes selectedNode startOffset endOffset =
+    let
+        startText =
+            String.left startOffset selectedNode.text
+
+        endText =
+            String.dropLeft endOffset selectedNode.text
+
+        startCharacterMetadata =
+            List.take startOffset selectedNode.characterMetadata
+
+        endCharacterMetadata =
+            List.drop endOffset selectedNode.characterMetadata
+
+        defaultSelection =
+            { anchorOffset = startOffset
+            , anchorNode = selectedNode.id
+            , focusOffset = endOffset
+            , focusNode = selectedNode.id
+            , isCollapsed = True
+            , rangeCount = 0
+            , selectionType = "Caret"
+            }
+    in
+    case List.length newDocumentNodes of
+        -- Cases:
+        -- New nodes are length 1, which means splicing in the text of the first block
+        -- New nodes are greater than 1, which means appending the text of the first block to the selectedNode,
+        -- appending the new node list, then appending the end text to the last node in the node list
+        0 ->
+            ( [ selectedNode ], defaultSelection )
+
+        1 ->
+            case List.head newDocumentNodes of
+                Nothing ->
+                    ( [ selectedNode ], defaultSelection )
+
+                Just newDocumentNode ->
+                    ( [ { selectedNode
+                            | text = startText ++ newDocumentNode.text ++ endText
+                            , characterMetadata = startCharacterMetadata ++ newDocumentNode.characterMetadata ++ endCharacterMetadata
+                        }
+                      ]
+                    , { anchorOffset = length startText + length newDocumentNode.text
+                      , anchorNode = selectedNode.id
+                      , focusOffset = length startText + length newDocumentNode.text
+                      , focusNode = selectedNode.id
+                      , isCollapsed = True
+                      , rangeCount = 0
+                      , selectionType = "Caret"
+                      }
+                    )
+
+        _ ->
+            case List.head newDocumentNodes of
+                Nothing ->
+                    ( [ selectedNode ], defaultSelection )
+
+                Just startNewNode ->
+                    case List.Extra.last newDocumentNodes of
+                        Nothing ->
+                            ( [ selectedNode ], defaultSelection )
+
+                        Just endNewNode ->
+                            let
+                                newStartNode =
+                                    { selectedNode
+                                        | text = startText ++ startNewNode.text
+                                        , characterMetadata = startCharacterMetadata ++ startNewNode.characterMetadata
+                                    }
+
+                                newEndNode =
+                                    { endNewNode
+                                        | text = endNewNode.text ++ endText
+                                        , characterMetadata = endNewNode.characterMetadata ++ endCharacterMetadata
+                                    }
+                            in
+                            ( [ newStartNode ] ++ List.take (List.length newDocumentNodes - 2) (List.drop 1 newDocumentNodes) ++ [ newEndNode ]
+                            , { anchorOffset = length endNewNode.text
+                              , anchorNode = newEndNode.id
+                              , focusOffset = length endNewNode.text
+                              , focusNode = newEndNode.id
+                              , isCollapsed = True
+                              , rangeCount = 0
+                              , selectionType = "Caret"
+                              }
+                            )
+
+
 removeSelected : Selection -> Document -> Document
 removeSelected selection document =
     let
@@ -597,16 +728,13 @@ insertAtSelection value document =
 
         Just selection ->
             let
-                dataLength =
-                    String.length value
-
-                td =
-                    mapDocument (insertIfSelected selection document.currentStyles value) document
-
-                newSel =
-                    { selection | focusOffset = selection.focusOffset + dataLength, anchorOffset = selection.anchorOffset + dataLength }
-
-                newDoc =
-                    { td | selection = Just newSel }
+                -- No need for a new id for a single node list insertion TODO: not clear that this behavior exists
+                newNodes =
+                    [ { id = ""
+                      , characterMetadata = repeat (String.length value) document.currentStyles
+                      , text = value
+                      , nodeType = "div"
+                      }
+                    ]
             in
-            newDoc
+            replaceSelected newNodes selection document
