@@ -3,14 +3,14 @@ module HandleBeforeInput exposing (..)
 import DocumentUtils exposing (insertAtSelection)
 import Html.Events exposing (preventDefaultOn)
 import Json.Decode as D
-import Model exposing (BeforeInput, Document, Msg(..))
+import Model exposing (Document, InputEvent, Msg(..))
 
 
 beforeInputDecoder : D.Decoder ( Msg, Bool )
 beforeInputDecoder =
     D.map alwaysPreventDefault
         (D.map OnBeforeInput
-            (D.map3 BeforeInput
+            (D.map3 InputEvent
                 (D.field "data" D.string)
                 (D.field "isComposing" D.bool)
                 (D.field "inputType" D.string)
@@ -37,7 +37,7 @@ alwaysPreventDefault msg =
 -- when range is selected
 
 
-handleBeforeInput : BeforeInput -> Document -> ( Document, Cmd Msg )
+handleBeforeInput : InputEvent -> Document -> ( Document, Cmd Msg )
 handleBeforeInput beforeInput model =
     if beforeInput.isComposing then
         ( model, Cmd.none )

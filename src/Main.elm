@@ -5,7 +5,7 @@
 --
 
 
-port module Main exposing (tryIncomingPort, tryKeyDown, tryOutgoingPort)
+port module Main exposing (updateSelection)
 
 import BasicEditor exposing (editorView)
 import Browser
@@ -16,13 +16,14 @@ import HandleBeforeInput exposing (handleBeforeInput, onBeforeInput)
 import HandleCompositionEnd exposing (handleCompositionEnd)
 import HandleCompositionStart exposing (handleCompositionStart)
 import HandleKeyDown exposing (handleKeyDown)
+import HandlePasteWithData exposing (handlePasteWithData)
 import Html exposing (Html, div, node)
 import Html.Attributes exposing (attribute, contenteditable, id, style)
 import Html.Events exposing (on, onBlur, preventDefaultOn)
 import Json.Decode as D
 import Json.Encode as E
-import List exposing (drop, repeat, take)
-import Model exposing (CharacterMetadata, CharacterStyle, Document, DocumentNode, DocumentNodeType, Keypress, Msg(..), Selection, emptyCharacterMetadata)
+import List exposing (repeat)
+import Model exposing (CharacterMetadata, CharacterStyle, Document, DocumentNode, DocumentNodeType, Keypress, Msg(..), PasteWithData, Selection, emptyCharacterMetadata)
 import Random
 import Set exposing (Set)
 import String exposing (length)
@@ -46,13 +47,7 @@ selectionDecoder =
         (D.field "type" D.string)
 
 
-port tryOutgoingPort : String -> Cmd m
-
-
-port tryIncomingPort : (E.Value -> msg) -> Sub msg
-
-
-port tryKeyDown : (E.Value -> msg) -> Sub msg
+port updateSelection : (E.Value -> msg) -> Sub msg
 
 
 
@@ -87,41 +82,9 @@ init s =
 -- UPDATE
 
 
-preventDefaultOnKeydown : Msg -> ( Msg, Bool )
-preventDefaultOnKeydown msg =
-    case msg of
-        OnKeyDown keypress ->
-            case keypress.key of
-                "Backspace" ->
-                    ( msg, True )
-
-                "Delete" ->
-                    ( msg, True )
-
-                "Tab" ->
-                    ( msg, True )
-
-                "Enter" ->
-                    ( msg, True )
-
-                "Return" ->
-                    ( msg, True )
-
-                _ ->
-                    ( msg, False )
-
-        _ ->
-            ( msg, False )
-
-
-onKeyDownDecoder : D.Decoder Msg
-onKeyDownDecoder =
-    D.map (\x -> OnKeyDown x) HandleKeyDown.keyDownDecoder
-
-
-onKeyDown : Html.Attribute Msg
-onKeyDown =
-    preventDefaultOn "keydown" (D.map preventDefaultOnKeydown onKeyDownDecoder)
+onInput : Html.Attribute Msg
+onInput =
+    Html.Events.onInput OnInput
 
 
 compositionEndDecoder =
@@ -134,6 +97,16 @@ onCompositionEnd =
 
 onCompositionStart =
     on "compositionstart" (D.succeed OnCompositionStart)
+
+
+onPasteWithData =
+    on "pastewithdata"
+        (D.map OnPasteWithData
+            (D.map2 PasteWithData
+                (D.at [ "detail", "text" ] D.string)
+                (D.at [ "detail", "html" ] D.string)
+            )
+        )
 
 
 updateOnRandom : Uuid -> Model -> ( Model, Cmd Msg )
@@ -172,6 +145,25 @@ update msg model =
         OnRandom uuid ->
             updateOnRandom uuid model
 
+        OnCopy v ->
+            -- Let the default behavior occur because there doesn't seem a way to be able to manipulate
+            -- the clipboard data
+            Debug.log "on copy" ( model, Cmd.none )
+
+        OnCut ->
+            -- Let the default behavior occur, but delete the selection and force a rerender
+            let
+                s =
+                    Debug.log "selection" model.selection
+            in
+            Debug.log "on cut" ( model, Cmd.none )
+
+        OnPaste ->
+            Debug.log "on paste" ( model, Cmd.none )
+
+        OnPasteWithData v ->
+            Debug.log "on pate with data" ( handlePasteWithData v model, Cmd.none )
+
         OnBeforeInput value ->
             Debug.log "on before input" (handleBeforeInput value model)
 
@@ -181,8 +173,11 @@ update msg model =
         OnCompositionEnd s ->
             Debug.log "composition end" (handleCompositionEnd s model)
 
+        OnInput v ->
+            Debug.log "on input" ( model, Cmd.none )
+
         OnBlur ->
-            ( model, tryOutgoingPort "blur" )
+            ( model, Cmd.none )
 
         SelectionEvent v ->
             updateOnSelection v model
@@ -197,7 +192,7 @@ update msg model =
             Debug.log "noop" ( model, Cmd.none )
 
         _ ->
-            ( model, tryOutgoingPort "test" )
+            ( model, Cmd.none )
 
 
 updateOnButtonPress : String -> Model -> ( Model, Cmd Msg )
@@ -283,6 +278,23 @@ onTestEvent =
     on "testevent" (D.succeed Noop)
 
 
+neverPreventDefault : msg -> ( msg, Bool )
+neverPreventDefault msg =
+    ( msg, False )
+
+
+onCopy =
+    preventDefaultOn "copy" (D.map neverPreventDefault (D.map OnCopy D.value))
+
+
+onPaste =
+    on "paste" (D.succeed OnPaste)
+
+
+onCut =
+    on "cut" (D.succeed OnCut)
+
+
 renderDocument : Document -> Html Msg
 renderDocument document =
     div
@@ -292,11 +304,17 @@ renderDocument document =
             , doOnBlur
             , onBeforeInput
             , onTestEvent
-            , onKeyDown
+            , HandleKeyDown.onKeyDown
+            , onInput
             , style "display" "inline-block"
             , onCompositionEnd
+            , onCopy
+            , onPaste
+            , onCut
+            , onPasteWithData
             , onCompositionStart
             , attribute "data-rte" "true"
+            , attribute "spellcheck" "false"
             , attribute "data-document-id" document.id
             ]
             (List.map renderDocumentNodeToHtml document.nodes)
@@ -310,4 +328,4 @@ renderDocument document =
 
 subscribe : Model -> Sub Msg
 subscribe model =
-    Sub.batch [ tryIncomingPort SelectionEvent, tryKeyDown KeyDownEvent ]
+    Sub.batch [ updateSelection SelectionEvent ]

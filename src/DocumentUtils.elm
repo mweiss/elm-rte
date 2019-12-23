@@ -722,3 +722,15 @@ insertAtSelection value document =
                     ]
             in
             replaceSelected newNodes selection document
+
+
+addIdToDocumentNode : String -> Int -> Int -> DocumentNode -> DocumentNode
+addIdToDocumentNode documentId start increment documentNode =
+    { documentNode | id = documentId ++ "-" ++ String.fromInt (start + increment + 1) }
+
+
+addIdsToDocumentNodes : List DocumentNode -> Document -> ( List DocumentNode, Document )
+addIdsToDocumentNodes nodes document =
+    ( List.indexedMap (addIdToDocumentNode document.id document.idCounter) nodes
+    , { document | idCounter = document.idCounter + List.length nodes }
+    )

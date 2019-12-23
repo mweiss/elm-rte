@@ -78,27 +78,31 @@ emptyCharacterMetadata =
     { styles = Set.empty }
 
 
-type alias BeforeInput =
+type alias InputEvent =
     { data : String, isComposing : Bool, inputType : String }
 
 
+type alias PasteWithData =
+    { text : String, html : String }
+
+
 type Msg
-    = OnBeforeInput BeforeInput
+    = OnBeforeInput InputEvent
     | Init
     | OnRandom Uuid
     | OnBlur
+    | OnPasteWithData PasteWithData
     | OnCompositionStart
-    | OnCopy
+    | OnCopy E.Value
     | OnCut
     | OnDragOver
     | OnDragStart
     | OnFocus
-    | OnInput
+    | OnInput String
     | OnPaste
     | OnSelect
     | OnKeyDown Keypress
     | OnCompositionEnd String
     | Noop
     | SelectionEvent E.Value
-    | KeyDownEvent E.Value
     | OnButtonPress String

@@ -5,7 +5,7 @@ import * as serviceWorker from './serviceWorker';
 // Testing web component -- will probably need polymer to use correctly
 class SelectionState extends HTMLElement {
   static get observedAttributes() {
-    return ['focus-offset', "anchor-offset", "anchor-node",
+    return ["focus-offset", "anchor-offset", "anchor-node",
       "focus-node", "is-collapsed", "range-count", "selection-type"];
   }
 
@@ -36,9 +36,6 @@ const app = Elm.Main.init({
 // unregister() to register() below. Note this comes with some pitfalls.
 // Learn more about service workers: https://bit.ly/CRA-PWA
 serviceWorker.unregister();
-
-app.ports.tryOutgoingPort.subscribe(function(data) {
-});
 
 
 const offsetAndNode = (node, offset) => {
@@ -117,7 +114,7 @@ document.addEventListener("selectionchange", (e) => {
   const anchorNode = findDocumentNodeId(selection.anchorNode);
   const focusNode = findDocumentNodeId(selection.focusNode);
 
-  app.ports.tryIncomingPort.send({
+  app.ports.updateSelection.send({
     "anchorOffset": selection.anchorOffset + anchorNode.offset,
     "focusOffset": selection.focusOffset + focusNode.offset,
     "isCollapsed": selection.isCollapsed,
@@ -126,6 +123,37 @@ document.addEventListener("selectionchange", (e) => {
     "anchorNode": anchorNode.id,
     "focusNode": focusNode.id
   });
+});
+
+
+document.addEventListener("paste", (e) => {
+  let node = e.target;
+
+  let documentId;
+  while (node && node.tagName !== "BODY") {
+    if (node.dataset && node.dataset.documentId) {
+      documentId = node.dataset.documentId;
+      break;
+    }
+    node = node.parentNode
+  }
+
+  if (!documentId) {
+    return;
+  }
+
+
+  let pasteData = (e.clipboardData || window.clipboardData).getData('text') || "";
+  let pasteDataHtml = (e.clipboardData || window.clipboardData).getData('text/html') || "";
+  let newEvent = new CustomEvent("pastewithdata", {
+    detail: {
+      text: pasteData,
+      html: pasteDataHtml
+    }
+  });
+  e.preventDefault();
+  console.log(node, newEvent);
+  node.dispatchEvent(newEvent)
 });
 
 // We create a synthetic keydown event in order to delegate the document logic to Elm.  Unfortunately,
@@ -146,7 +174,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
-  e = new CustomEvent("keydown", {
+  let newEvent = new CustomEvent("keydown", {
     keyCode: e.keyCode,
     key: e.key,
     altKey: e.altKey,
@@ -161,9 +189,9 @@ document.addEventListener("keydown", (e) => {
     DOM_KEY_LOCATION_STANDARD: e.DOM_KEY_LOCATION_STANDARD
   });
 
-  const cancelled = node.dispatchEvent(e);
+  const cancelled = node.dispatchEvent(newEvent);
   if (cancelled) {
-    e.preventDefault();
+    // e.preventDefault();
   }
 });
 
@@ -188,8 +216,8 @@ if (IS_FIREFOX) {
           isComposing: isComposing,
           inputType: "insertText"
         });
-        let preventDefault = node.dispatchEvent(event);
-        if (preventDefault) {
+        let cancelled = node.dispatchEvent(event);
+        if (cancelled) {
           e.preventDefault()
         }
         break;

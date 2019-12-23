@@ -1,13 +1,47 @@
-module HandleKeyDown exposing (handleKeyDown, keyDownDecoder)
+module HandleKeyDown exposing (handleKeyDown, keyDownDecoder, onKeyDown)
 
-import Debug as Debug
 import DocumentUtils exposing (backspace, backspaceWord, delete, deleteWord, splitBlock)
+import Html
+import Html.Events exposing (preventDefaultOn)
 import Json.Decode as D
-import Json.Encode as E
-import List exposing (drop, repeat, take)
 import Model exposing (..)
-import String exposing (length)
-import String.Extra exposing (insertAt)
+
+
+onKeyDownDecoder : D.Decoder Msg
+onKeyDownDecoder =
+    D.map (\x -> OnKeyDown x) keyDownDecoder
+
+
+preventDefaultOnKeydown : Msg -> ( Msg, Bool )
+preventDefaultOnKeydown msg =
+    case msg of
+        OnKeyDown keypress ->
+            case keypress.key of
+                "Backspace" ->
+                    ( msg, True )
+
+                "Delete" ->
+                    ( msg, True )
+
+                "Tab" ->
+                    ( msg, True )
+
+                "Enter" ->
+                    ( msg, True )
+
+                "Return" ->
+                    ( msg, True )
+
+                _ ->
+                    ( msg, False )
+
+        _ ->
+            ( msg, False )
+
+
+onKeyDown : Html.Attribute Msg
+onKeyDown =
+    preventDefaultOn "keydown" (D.map preventDefaultOnKeydown onKeyDownDecoder)
 
 
 keyDownDecoder : D.Decoder Keypress
