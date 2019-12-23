@@ -1,7 +1,6 @@
 import './main.css';
 import { Elm } from './Main.elm';
 import * as serviceWorker from './serviceWorker';
-import {keys} from "./keys";
 
 // Testing web component -- will probably need polymer to use correctly
 class SelectionState extends HTMLElement {
@@ -17,13 +16,12 @@ class SelectionState extends HTMLElement {
     const anchorNode = this.getAttribute("anchor-node");
 
     if (focusNode && anchorNode) {
-      expectedSelectionState = {
+      updateSelectionToExpected({
         focusNode: focusNode,
         focusOffset: focusOffset,
         anchorOffset: anchorOffset,
         anchorNode: anchorNode
-      };
-      updateSelectionToExpected();
+      });
     }
   }
 }
@@ -41,10 +39,6 @@ serviceWorker.unregister();
 
 app.ports.tryOutgoingPort.subscribe(function(data) {
 });
-
-// TODO: use browser check library, or just don't do browser checks
-// This is so bad to store this, but it's here so I can test delaying the function
-let expectedSelectionState = null;
 
 
 const offsetAndNode = (node, offset) => {
@@ -70,10 +64,9 @@ const selectDocumentNodeById = (id) => {
   return document.querySelector(`[data-document-node-id="${id}"]`)
 };
 
-const updateSelectionToExpected = () => {
+const updateSelectionToExpected = (expectedSelectionState) => {
   if (expectedSelectionState) {
     const data = expectedSelectionState;
-    expectedSelectionState = null;
 
     const focusNode = selectDocumentNodeById(data.focusNode);
     const anchorNode = selectDocumentNodeById(data.anchorNode);
@@ -120,7 +113,6 @@ const findDocumentNodeId = (node) => {
 };
 
 document.addEventListener("selectionchange", (e) => {
-  // updateSelectionToExpected()
   const selection = getSelection();
   const anchorNode = findDocumentNodeId(selection.anchorNode);
   const focusNode = findDocumentNodeId(selection.focusNode);
@@ -136,6 +128,8 @@ document.addEventListener("selectionchange", (e) => {
   });
 });
 
+// We create a synthetic keydown event in order to delegate the document logic to Elm.  Unfortunately,
+// as of 0.19, Elm does not have a document keydown event that you can call preventDefault on.
 document.addEventListener("keydown", (e) => {
   let node = e.target;
 
@@ -152,17 +146,24 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
-  switch(e.key) {
-    case "Backspace":
-    case "Delete":
-    case "Tab":
-    case "Enter":
-    case "Return":
-      e.preventDefault();
-      app.ports.tryKeyDown.send(e);
-      break;
-    default:
-      // Do nothing.
+  e = new CustomEvent("keydown", {
+    keyCode: e.keyCode,
+    key: e.key,
+    altKey: e.altKey,
+    metaKey: e.metaKey,
+    ctrlKey: e.ctrlKey,
+    repeat: e.repeat,
+    shiftKey: e.shiftKey,
+    isComposing: e.isComposing,
+    DOM_KEY_LOCATION_LEFT: e.DOM_KEY_LOCATION_LEFT,
+    DOM_KEY_LOCATION_NUMPAD: e.DOM_KEY_LOCATION_NUMPAD,
+    DOM_KEY_LOCATION_RIGHT: e.DOM_KEY_LOCATION_RIGHT,
+    DOM_KEY_LOCATION_STANDARD: e.DOM_KEY_LOCATION_STANDARD
+  });
+
+  const cancelled = node.dispatchEvent(e);
+  if (cancelled) {
+    e.preventDefault();
   }
 });
 

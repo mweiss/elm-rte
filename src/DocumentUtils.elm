@@ -1,29 +1,11 @@
 module DocumentUtils exposing (..)
 
 import DeleteWord
-import List exposing (drop, repeat, take)
+import List exposing (repeat)
 import List.Extra
 import Model exposing (..)
 import Regex
 import String exposing (length)
-import String.Extra exposing (insertAt)
-
-
-mapDocument : (DocumentNode -> DocumentNode) -> Document -> Document
-mapDocument fn document =
-    { document | nodes = List.map fn document.nodes }
-
-
-insertIfSelected : Selection -> CharacterMetadata -> String -> DocumentNode -> DocumentNode
-insertIfSelected selection cm s node =
-    if String.startsWith node.id selection.focusNode then
-        { node
-            | text = insertAt s selection.focusOffset node.text
-            , characterMetadata = take selection.focusOffset node.characterMetadata ++ repeat (length s) cm ++ drop selection.focusOffset node.characterMetadata
-        }
-
-    else
-        node
 
 
 getSelectionBlocks : Selection -> List DocumentNode -> ( List DocumentNode, List DocumentNode, List DocumentNode )
@@ -438,6 +420,7 @@ replaceRange newDocumentNodes selectedNode startOffset endOffset =
     in
     case List.length newDocumentNodes of
         -- Cases:
+        -- No new nodes, just return the selection
         -- New nodes are length 1, which means splicing in the text of the first block
         -- New nodes are greater than 1, which means appending the text of the first block to the selectedNode,
         -- appending the new node list, then appending the end text to the last node in the node list
@@ -508,14 +491,14 @@ removeSelected selection document =
             getSelectionBlocks selection document.nodes
     in
     case List.length selected of
-        -- TODO: Invalid state?
+        -- If we have an invalid selection, then just return the document
         0 ->
             document
 
         -- Remove selected text
         1 ->
             case List.head selected of
-                -- TODO: Invalid state?
+                -- I don't think we can reach this case, there's probably a better way to write this...
                 Nothing ->
                     document
 
@@ -546,12 +529,13 @@ removeSelected selection document =
         -- Remove across multiple nodes
         _ ->
             case List.head selected of
-                -- TODO: Invalid state, is there a better way?
+                -- No way to reach this state, but I'm not sure the cleaner way
                 Nothing ->
                     document
 
                 Just selectedStart ->
                     case List.Extra.last selected of
+                        -- No way to reach this state, but I'm not sure the cleaner way
                         Nothing ->
                             document
 
@@ -698,7 +682,7 @@ splitBlock selection document =
         lastSelectedNodeId =
             case List.Extra.last newNodes of
                 Nothing ->
-                    "INVALID"
+                    ""
 
                 Just node ->
                     node.id

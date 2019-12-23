@@ -87,18 +87,41 @@ init s =
 -- UPDATE
 
 
-alwaysPreventDefault : msg -> ( msg, Bool )
-alwaysPreventDefault msg =
-    ( msg, True )
+preventDefaultOnKeydown : Msg -> ( Msg, Bool )
+preventDefaultOnKeydown msg =
+    case msg of
+        OnKeyDown keypress ->
+            case keypress.key of
+                "Backspace" ->
+                    ( msg, True )
+
+                "Delete" ->
+                    ( msg, True )
+
+                "Tab" ->
+                    ( msg, True )
+
+                "Enter" ->
+                    ( msg, True )
+
+                "Return" ->
+                    ( msg, True )
+
+                _ ->
+                    ( msg, False )
+
+        _ ->
+            ( msg, False )
 
 
-keyDownDecoder : D.Decoder ( Msg, Bool )
-keyDownDecoder =
-    D.map alwaysPreventDefault (D.at [ "keyCode" ] (D.map OnKeyDown D.string))
+onKeyDownDecoder : D.Decoder Msg
+onKeyDownDecoder =
+    D.map (\x -> OnKeyDown x) HandleKeyDown.keyDownDecoder
 
 
+onKeyDown : Html.Attribute Msg
 onKeyDown =
-    preventDefaultOn "keydown" keyDownDecoder
+    preventDefaultOn "keydown" (D.map preventDefaultOnKeydown onKeyDownDecoder)
 
 
 compositionEndDecoder =
@@ -164,7 +187,7 @@ update msg model =
         SelectionEvent v ->
             updateOnSelection v model
 
-        KeyDownEvent v ->
+        OnKeyDown v ->
             Debug.log "keydown" (handleKeyDown v model)
 
         OnButtonPress v ->

@@ -96,7 +96,7 @@ type Msg
     | OnInput
     | OnPaste
     | OnSelect
-    | OnKeyDown String
+    | OnKeyDown Keypress
     | OnCompositionEnd String
     | Noop
     | SelectionEvent E.Value

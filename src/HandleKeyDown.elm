@@ -1,7 +1,7 @@
-module HandleKeyDown exposing (handleKeyDown)
+module HandleKeyDown exposing (handleKeyDown, keyDownDecoder)
 
 import Debug as Debug
-import DocumentUtils exposing (backspace, backspaceWord, delete, deleteWord, insertIfSelected, mapDocument, splitBlock)
+import DocumentUtils exposing (backspace, backspaceWord, delete, deleteWord, splitBlock)
 import Json.Decode as D
 import Json.Encode as E
 import List exposing (drop, repeat, take)
@@ -60,50 +60,40 @@ handleDeleteWord model selection =
     ( deleteWord selection model, Cmd.none )
 
 
-handleKeyDown : E.Value -> Document -> ( Document, Cmd Msg )
-handleKeyDown keypressValue model =
-    let
-        keyPress =
-            Debug.log "Testing incoming port" (D.decodeValue keyDownDecoder keypressValue)
-    in
-    case keyPress of
-        Err err ->
-            Debug.log "Error parsing key press" ( model, Cmd.none )
+handleKeyDown : Keypress -> Document -> ( Document, Cmd Msg )
+handleKeyDown keypress model =
+    case model.selection of
+        Nothing ->
+            ( model, Cmd.none )
 
-        Ok keypress ->
-            -- TODO: handle all cases
-            case model.selection of
-                Nothing ->
-                    ( model, Cmd.none )
+        Just selection ->
+            if model.isComposing then
+                ( model, Cmd.none )
 
-                Just selection ->
-                    if model.isComposing then
+            else
+                case keypress.key of
+                    "Backspace" ->
+                        if keypress.ctrlKey then
+                            handleBackspaceWord model selection
+
+                        else
+                            handleBackspace model selection
+
+                    "Delete" ->
+                        if keypress.ctrlKey then
+                            handleDeleteWord model selection
+
+                        else
+                            handleDelete model selection
+
+                    "Tab" ->
+                        handleTab model selection
+
+                    "Enter" ->
+                        handleEnter model selection
+
+                    "Return" ->
+                        handleEnter model selection
+
+                    _ ->
                         ( model, Cmd.none )
-
-                    else
-                        case keypress.key of
-                            "Backspace" ->
-                                if keypress.ctrlKey then
-                                    handleBackspaceWord model selection
-
-                                else
-                                    handleBackspace model selection
-
-                            "Delete" ->
-                                if keypress.ctrlKey then
-                                    handleDeleteWord model selection
-
-                                else
-                                    handleDelete model selection
-
-                            "Tab" ->
-                                handleTab model selection
-
-                            "Enter" ->
-                                handleEnter model selection
-
-                            "Return" ->
-                                handleEnter model selection
-
-                            _ ->
-                                ( model, Cmd.none )

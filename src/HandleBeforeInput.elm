@@ -1,6 +1,6 @@
 module HandleBeforeInput exposing (..)
 
-import DocumentUtils exposing (insertAtSelection, insertIfSelected, mapDocument)
+import DocumentUtils exposing (insertAtSelection)
 import Html.Events exposing (preventDefaultOn)
 import Json.Decode as D
 import Model exposing (BeforeInput, Document, Msg(..))
