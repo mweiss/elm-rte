@@ -12,7 +12,7 @@ beforeInputDecoder =
         (D.map OnBeforeInput
             (D.map3 InputEvent
                 (D.field "data" D.string)
-                (D.field "isComposing" D.bool)
+                (D.oneOf [ D.field "isComposing" D.bool, D.succeed False ])
                 (D.field "inputType" D.string)
             )
         )
@@ -39,7 +39,7 @@ alwaysPreventDefault msg =
 
 handleBeforeInput : InputEvent -> Document -> ( Document, Cmd Msg )
 handleBeforeInput beforeInput model =
-    if beforeInput.isComposing then
+    if model.isComposing then
         ( model, Cmd.none )
 
     else

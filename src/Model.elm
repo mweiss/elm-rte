@@ -44,6 +44,7 @@ type alias Keypress =
 type alias Document =
     { id : String
     , idCounter : Int
+    , renderCount : Int
     , nodes : List DocumentNode
     , selection : Maybe Selection
     , currentStyles : CharacterMetadata

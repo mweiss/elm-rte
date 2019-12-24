@@ -156,6 +156,10 @@ document.addEventListener("paste", (e) => {
   node.dispatchEvent(newEvent)
 });
 
+document.addEventListener("input", (e) => {
+  console.log(e)
+});
+
 // We create a synthetic keydown event in order to delegate the document logic to Elm.  Unfortunately,
 // as of 0.19, Elm does not have a document keydown event that you can call preventDefault on.
 document.addEventListener("keydown", (e) => {

@@ -15,11 +15,13 @@ import EditorNodeToHtml exposing (..)
 import HandleBeforeInput exposing (handleBeforeInput, onBeforeInput)
 import HandleCompositionEnd exposing (handleCompositionEnd)
 import HandleCompositionStart exposing (handleCompositionStart)
+import HandleCut exposing (handleCut)
 import HandleKeyDown exposing (handleKeyDown)
 import HandlePasteWithData exposing (handlePasteWithData)
 import Html exposing (Html, div, node)
 import Html.Attributes exposing (attribute, contenteditable, id, style)
 import Html.Events exposing (on, onBlur, preventDefaultOn)
+import Html.Keyed
 import Json.Decode as D
 import Json.Encode as E
 import List exposing (repeat)
@@ -70,7 +72,7 @@ initialDocumentNodes =
 
 initialDocument : Document
 initialDocument =
-    Document "" 1 initialDocumentNodes Nothing (CharacterMetadata Set.empty) False
+    Document "" 1 0 initialDocumentNodes Nothing (CharacterMetadata Set.empty) False
 
 
 init : () -> ( Model, Cmd Msg )
@@ -152,11 +154,7 @@ update msg model =
 
         OnCut ->
             -- Let the default behavior occur, but delete the selection and force a rerender
-            let
-                s =
-                    Debug.log "selection" model.selection
-            in
-            Debug.log "on cut" ( model, Cmd.none )
+            Debug.log "on cut" ( handleCut model, Cmd.none )
 
         OnPaste ->
             Debug.log "on paste" ( model, Cmd.none )
@@ -165,7 +163,11 @@ update msg model =
             Debug.log "on pate with data" ( handlePasteWithData v model, Cmd.none )
 
         OnBeforeInput value ->
-            Debug.log "on before input" (handleBeforeInput value model)
+            let
+                x =
+                    Debug.log "beforeinputvalue" value
+            in
+            handleBeforeInput value model
 
         OnCompositionStart ->
             Debug.log "composition start" (handleCompositionStart model)
@@ -299,7 +301,7 @@ renderDocument : Document -> Html Msg
 renderDocument document =
     div
         []
-        [ div
+        [ Html.Keyed.node "div"
             [ contenteditable True
             , doOnBlur
             , onBeforeInput
@@ -317,7 +319,7 @@ renderDocument document =
             , attribute "spellcheck" "false"
             , attribute "data-document-id" document.id
             ]
-            (List.map renderDocumentNodeToHtml document.nodes)
+            [ ( String.fromInt document.renderCount, div [] (List.map renderDocumentNodeToHtml document.nodes) ) ]
         , node "selection-state" (selectionAttributesIfPresent document.selection) []
         ]
 
