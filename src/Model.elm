@@ -38,6 +38,7 @@ type alias Keypress =
     , altKey : Bool
     , metaKey : Bool
     , ctrlKey : Bool
+    , isComposing : Bool
     }
 
 
@@ -87,12 +88,17 @@ type alias PasteWithData =
     { text : String, html : String }
 
 
+type alias DocumentNodeChange =
+    { node : String, text : String }
+
+
 type Msg
     = OnBeforeInput InputEvent
     | Init
     | OnRandom Uuid
     | OnBlur
     | OnPasteWithData PasteWithData
+    | OnDocumentNodeChange DocumentNodeChange
     | OnCompositionStart
     | OnCopy E.Value
     | OnCut

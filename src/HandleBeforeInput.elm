@@ -8,7 +8,7 @@ import Model exposing (Document, InputEvent, Msg(..))
 
 beforeInputDecoder : D.Decoder ( Msg, Bool )
 beforeInputDecoder =
-    D.map alwaysPreventDefault
+    D.map neverPreventDefault
         (D.map OnBeforeInput
             (D.map3 InputEvent
                 (D.field "data" D.string)
@@ -23,12 +23,12 @@ onBeforeInput =
 
 
 
--- For now, always prevent the default from happening
+-- For now, never prevent the default from happening... actually we should not even
 
 
-alwaysPreventDefault : msg -> ( msg, Bool )
-alwaysPreventDefault msg =
-    ( msg, True )
+neverPreventDefault : msg -> ( msg, Bool )
+neverPreventDefault msg =
+    ( msg, False )
 
 
 

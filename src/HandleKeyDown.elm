@@ -16,24 +16,28 @@ preventDefaultOnKeydown : Msg -> ( Msg, Bool )
 preventDefaultOnKeydown msg =
     case msg of
         OnKeyDown keypress ->
-            case keypress.key of
-                "Backspace" ->
-                    ( msg, True )
+            if keypress.isComposing then
+                ( msg, False )
 
-                "Delete" ->
-                    ( msg, True )
+            else
+                case keypress.key of
+                    "Backspace" ->
+                        ( msg, True )
 
-                "Tab" ->
-                    ( msg, True )
+                    "Delete" ->
+                        ( msg, True )
 
-                "Enter" ->
-                    ( msg, True )
+                    "Tab" ->
+                        ( msg, True )
 
-                "Return" ->
-                    ( msg, True )
+                    "Enter" ->
+                        ( msg, True )
 
-                _ ->
-                    ( msg, False )
+                    "Return" ->
+                        ( msg, True )
+
+                    _ ->
+                        ( msg, False )
 
         _ ->
             ( msg, False )
@@ -46,12 +50,13 @@ onKeyDown =
 
 keyDownDecoder : D.Decoder Keypress
 keyDownDecoder =
-    D.map5 Keypress
+    D.map6 Keypress
         (D.field "keyCode" D.int)
         (D.field "key" D.string)
         (D.field "altKey" D.bool)
         (D.field "metaKey" D.bool)
         (D.field "ctrlKey" D.bool)
+        (D.oneOf [ D.field "isComposing" D.bool, D.succeed False ])
 
 
 

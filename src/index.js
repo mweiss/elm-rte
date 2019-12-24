@@ -14,6 +14,7 @@ class SelectionState extends HTMLElement {
     const focusNode = this.getAttribute("focus-node");
     const anchorOffset = Number(this.getAttribute("anchor-offset"));
     const anchorNode = this.getAttribute("anchor-node");
+    console.log('changed', window.getSelection(), focusOffset, focusNode, anchorOffset, anchorNode);
 
     if (focusNode && anchorNode) {
       updateSelectionToExpected({
@@ -113,7 +114,6 @@ document.addEventListener("selectionchange", (e) => {
   const selection = getSelection();
   const anchorNode = findDocumentNodeId(selection.anchorNode);
   const focusNode = findDocumentNodeId(selection.focusNode);
-
   app.ports.updateSelection.send({
     "anchorOffset": selection.anchorOffset + anchorNode.offset,
     "focusOffset": selection.focusOffset + focusNode.offset,
@@ -156,61 +156,70 @@ document.addEventListener("paste", (e) => {
   node.dispatchEvent(newEvent)
 });
 
-document.addEventListener("input", (e) => {
-  console.log(e)
-});
-
-// We create a synthetic keydown event in order to delegate the document logic to Elm.  Unfortunately,
-// as of 0.19, Elm does not have a document keydown event that you can call preventDefault on.
-document.addEventListener("keydown", (e) => {
-  let node = e.target;
-
-  let documentId;
-  while (node && node.tagName !== "BODY") {
-    if (node.dataset && node.dataset.documentId) {
-      documentId = node.dataset.documentId;
-      break;
-    }
-    node = node.parentNode
+const deriveTextFromDocumentNode = (node) => {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return (node.nodeValue || "")
   }
 
-  if (!documentId) {
+  let value = "";
+  for (let childNode of node.childNodes) {
+    if (!childNode.dataset || !childNode.dataset.isEntity) {
+      value += deriveTextFromDocumentNode(childNode)
+    }
+  }
+  return value;
+};
+
+let isComposing = false;
+document.addEventListener("compositionstart", (e) => {
+  isComposing = true
+});
+
+document.addEventListener("compositionend", (e) => {
+  isComposing = false;
+});
+
+document.addEventListener("input", (e) => {
+  if (isComposing) {
+    return;
+  }
+  let selection = window.getSelection();
+  console.log('test', e);
+  // If something happens on input, then we need to get the selection anchor node and derive what
+  // the new text is.  This usually means that an autocomplete or spellcheck action occurred.
+  // Since we really don't know what the difference is, we'll pass the new text to the editor and let
+  // it resolve the difference.  Note that this probably will result in loss of style information since
+  // the browser mangles the spans inside a document node, so it's unreliable to pass that information
+  // to the editor.
+
+  if (!e.target || !e.target.dataset || !e.target.dataset.documentId) {
     return;
   }
 
-  let newEvent = new CustomEvent("keydown", {
-    keyCode: e.keyCode,
-    key: e.key,
-    altKey: e.altKey,
-    metaKey: e.metaKey,
-    ctrlKey: e.ctrlKey,
-    repeat: e.repeat,
-    shiftKey: e.shiftKey,
-    isComposing: e.isComposing,
-    DOM_KEY_LOCATION_LEFT: e.DOM_KEY_LOCATION_LEFT,
-    DOM_KEY_LOCATION_NUMPAD: e.DOM_KEY_LOCATION_NUMPAD,
-    DOM_KEY_LOCATION_RIGHT: e.DOM_KEY_LOCATION_RIGHT,
-    DOM_KEY_LOCATION_STANDARD: e.DOM_KEY_LOCATION_STANDARD
-  });
-
-  const cancelled = node.dispatchEvent(newEvent);
-  if (cancelled) {
-    // e.preventDefault();
+  if (!selection || !selection.anchorNode) {
+    return;
   }
+
+  const anchorNode = findDocumentNodeId(selection.anchorNode);
+  let node = selectDocumentNodeById(anchorNode.id);
+  console.log('node?', anchorNode.id, anchorNode, node);
+  if (!node) {
+    return;
+  }
+  let text = deriveTextFromDocumentNode(node);
+  console.log('the text', text)
+  let event = new CustomEvent("documentnodechange", {
+    detail: {
+      node: anchorNode.id, text: text
+    }
+  });
+  console.log(event);
+  e.target.dispatchEvent(event);
 });
 
 // Firefox does not support beforeinput, so let's create a synthetic beforeinput event
 const IS_FIREFOX = typeof InstallTrigger !== 'undefined';
 if (IS_FIREFOX) {
-  let isComposing = false;
-  document.addEventListener("compositionstart", (e) => {
-    isComposing = true
-  });
-
-  document.addEventListener("compositionend", (e) => {
-    isComposing = false;
-  });
-
   document.addEventListener("keypress", (e) => {
     let node = e.target;
     while (node && node.tagName !== "BODY") {

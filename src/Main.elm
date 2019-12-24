@@ -16,6 +16,7 @@ import HandleBeforeInput exposing (handleBeforeInput, onBeforeInput)
 import HandleCompositionEnd exposing (handleCompositionEnd)
 import HandleCompositionStart exposing (handleCompositionStart)
 import HandleCut exposing (handleCut)
+import HandleDocumentNodeChange exposing (decodeDocumentNodeChange, handleDocumentNodeChange)
 import HandleKeyDown exposing (handleKeyDown)
 import HandlePasteWithData exposing (handlePasteWithData)
 import Html exposing (Html, div, node)
@@ -178,6 +179,9 @@ update msg model =
         OnInput v ->
             Debug.log "on input" ( model, Cmd.none )
 
+        OnDocumentNodeChange v ->
+            Debug.log "nodechange" ( handleDocumentNodeChange v model, Cmd.none )
+
         OnBlur ->
             ( model, Cmd.none )
 
@@ -297,6 +301,10 @@ onCut =
     on "cut" (D.succeed OnCut)
 
 
+onDocumentNodeChange =
+    on "documentnodechange" decodeDocumentNodeChange
+
+
 renderDocument : Document -> Html Msg
 renderDocument document =
     div
@@ -311,6 +319,7 @@ renderDocument document =
             , style "display" "inline-block"
             , onCompositionEnd
             , onCopy
+            , onDocumentNodeChange
             , onPaste
             , onCut
             , onPasteWithData

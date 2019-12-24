@@ -720,8 +720,14 @@ insertAtSelection value document =
                       , nodeType = "div"
                       }
                     ]
+
+                newDocument =
+                    replaceSelected newNodes selection document
+
+                selectionDebug =
+                    Debug.log "selection debug" newDocument.selection
             in
-            replaceSelected newNodes selection document
+            newDocument
 
 
 addIdToDocumentNode : String -> Int -> Int -> DocumentNode -> DocumentNode

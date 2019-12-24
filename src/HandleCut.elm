@@ -14,8 +14,5 @@ handleCut document =
             let
                 newDocument =
                     DocumentUtils.removeSelected selection document
-
-                newSelection =
-                    Debug.log "new selection" newDocument.selection
             in
             { newDocument | renderCount = newDocument.renderCount + 1 }
