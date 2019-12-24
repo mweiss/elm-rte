@@ -14,7 +14,6 @@ class SelectionState extends HTMLElement {
     const focusNode = this.getAttribute("focus-node");
     const anchorOffset = Number(this.getAttribute("anchor-offset"));
     const anchorNode = this.getAttribute("anchor-node");
-    console.log('changed', window.getSelection(), focusOffset, focusNode, anchorOffset, anchorNode);
 
     if (focusNode && anchorNode) {
       updateSelectionToExpected({
@@ -85,9 +84,7 @@ const updateSelectionToExpected = (expectedSelectionState) => {
     } catch (e) {
       // TODO: look into why selection state is sometimes incorrect
       console.log("Uh oh, the selection state was incorrect!" +
-          "This maybe happens because attributes are stale on the web component?");
-      console.log("Test data", anchorData.node, anchorData.offset, focusData.node, focusData.offset);
-      console.log("Test data2", data, focusData, anchorData);
+          "This maybe happens because attributes are stale on the web component?",  data, focusData, anchorData);
     }
   }
 
@@ -184,7 +181,6 @@ document.addEventListener("input", (e) => {
     return;
   }
   let selection = window.getSelection();
-  console.log('test', e);
   // If something happens on input, then we need to get the selection anchor node and derive what
   // the new text is.  This usually means that an autocomplete or spellcheck action occurred.
   // Since we really don't know what the difference is, we'll pass the new text to the editor and let
@@ -202,18 +198,16 @@ document.addEventListener("input", (e) => {
 
   const anchorNode = findDocumentNodeId(selection.anchorNode);
   let node = selectDocumentNodeById(anchorNode.id);
-  console.log('node?', anchorNode.id, anchorNode, node);
   if (!node) {
     return;
   }
   let text = deriveTextFromDocumentNode(node);
-  console.log('the text', text)
+  console.log("Derived text", text);
   let event = new CustomEvent("documentnodechange", {
     detail: {
       node: anchorNode.id, text: text
     }
   });
-  console.log(event);
   e.target.dispatchEvent(event);
 });
 
@@ -224,6 +218,9 @@ if (IS_FIREFOX) {
     let node = e.target;
     while (node && node.tagName !== "BODY") {
       if (node.dataset && node.dataset.documentId) {
+        if (isComposing) {
+          return;
+        }
         let event = new InputEvent("beforeinput", {
           data: e.key,
           isComposing: isComposing,

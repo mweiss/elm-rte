@@ -325,10 +325,12 @@ renderDocument document =
             , onPasteWithData
             , onCompositionStart
             , attribute "data-rte" "true"
-            , attribute "spellcheck" "false"
             , attribute "data-document-id" document.id
             ]
-            [ ( String.fromInt document.renderCount, div [] (List.map renderDocumentNodeToHtml document.nodes) ) ]
+            [ -- hangulbuffer exists because in Firefox on MacOS, Korean IME sometimes puts characters in the beginning of the content editable
+              ( "hangulbuffer" ++ String.fromInt document.renderCount, Html.text "" )
+            , ( String.fromInt document.renderCount, div [] (List.map renderDocumentNodeToHtml document.nodes) )
+            ]
         , node "selection-state" (selectionAttributesIfPresent document.selection) []
         ]
 
