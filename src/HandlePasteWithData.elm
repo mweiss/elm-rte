@@ -16,7 +16,7 @@ handlePasteWithData pasteWithData document =
                     DocumentUtils.addIdsToDocumentNodes (textToDocumentNodes pasteWithData.text) document
 
                 documentWithInsertedText =
-                    Debug.log "documentWithInsertedText" DocumentUtils.replaceSelected newNodes selection newDocument
+                    DocumentUtils.replaceSelected newNodes selection newDocument
             in
             documentWithInsertedText
 

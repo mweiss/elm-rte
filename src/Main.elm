@@ -11,6 +11,7 @@ import BasicEditor exposing (editorView)
 import Browser
 import Debug as Debug
 import DocumentNodeToEditorNode exposing (..)
+import DocumentUtils
 import EditorNodeToHtml exposing (..)
 import HandleBeforeInput exposing (handleBeforeInput, onBeforeInput)
 import HandleCompositionEnd exposing (handleCompositionEnd)
@@ -20,7 +21,7 @@ import HandleDocumentNodeChange exposing (decodeDocumentNodeChange, handleDocume
 import HandleKeyDown exposing (handleKeyDown)
 import HandlePasteWithData exposing (handlePasteWithData)
 import Html exposing (Html, div, node)
-import Html.Attributes exposing (attribute, contenteditable, id, style)
+import Html.Attributes exposing (attribute, class, contenteditable, style)
 import Html.Events exposing (on, onBlur, preventDefaultOn)
 import Html.Keyed
 import Json.Decode as D
@@ -63,7 +64,7 @@ type alias Model =
 
 initialText : String
 initialText =
-    "test text"
+    "Write something here..."
 
 
 initialDocumentNodes : List DocumentNode
@@ -133,7 +134,7 @@ updateOnSelection selectionValue model =
         in
         case selection of
             Err err ->
-                Debug.log "Error parsing selection!" ( model, Cmd.none )
+                ( model, Cmd.none )
 
             Ok s ->
                 ( { model | selection = Just s }, Cmd.none )
@@ -151,36 +152,32 @@ update msg model =
         OnCopy v ->
             -- Let the default behavior occur because there doesn't seem a way to be able to manipulate
             -- the clipboard data
-            Debug.log "on copy" ( model, Cmd.none )
+            ( model, Cmd.none )
 
         OnCut ->
             -- Let the default behavior occur, but delete the selection and force a rerender
-            Debug.log "on cut" ( handleCut model, Cmd.none )
+            ( handleCut model, Cmd.none )
 
         OnPaste ->
-            Debug.log "on paste" ( model, Cmd.none )
+            ( model, Cmd.none )
 
         OnPasteWithData v ->
-            Debug.log "on pate with data" ( handlePasteWithData v model, Cmd.none )
+            ( handlePasteWithData v model, Cmd.none )
 
         OnBeforeInput value ->
-            let
-                x =
-                    Debug.log "beforeinputvalue" value
-            in
             handleBeforeInput value model
 
         OnCompositionStart ->
-            Debug.log "composition start" (handleCompositionStart model)
+            handleCompositionStart model
 
         OnCompositionEnd s ->
-            Debug.log "composition end" (handleCompositionEnd s model)
+            handleCompositionEnd s model
 
         OnInput v ->
-            Debug.log "on input" ( model, Cmd.none )
+            ( model, Cmd.none )
 
         OnDocumentNodeChange v ->
-            Debug.log "nodechange" ( handleDocumentNodeChange v model, Cmd.none )
+            ( handleDocumentNodeChange v model, Cmd.none )
 
         OnBlur ->
             ( model, Cmd.none )
@@ -189,13 +186,13 @@ update msg model =
             updateOnSelection v model
 
         OnKeyDown v ->
-            Debug.log "keydown" (handleKeyDown v model)
+            handleKeyDown v model
 
         OnButtonPress v ->
             updateOnButtonPress v model
 
         Noop ->
-            Debug.log "noop" ( model, Cmd.none )
+            ( model, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -203,12 +200,56 @@ update msg model =
 
 updateOnButtonPress : String -> Model -> ( Model, Cmd Msg )
 updateOnButtonPress buttonValue model =
-    case buttonValue of
-        "Bold" ->
-            ( { model | currentStyles = toggleStyle model.currentStyles buttonValue }, Cmd.none )
+    if List.member buttonValue [ "Bold", "Italic", "Underline", "Monospace" ] then
+        let
+            newStyles =
+                toggleStyle model.currentStyles buttonValue
 
-        _ ->
-            ( model, Cmd.none )
+            newDocument =
+                case model.selection of
+                    Nothing ->
+                        model
+
+                    Just selection ->
+                        DocumentUtils.setStylesOnSelection newStyles selection model
+        in
+        ( { newDocument | currentStyles = newStyles }, Cmd.none )
+
+    else if List.member buttonValue [ "H1", "H2", "H3", "H4", "H5", "H6", "Blockquote" ] then
+        ( toggleSelectedBlocks buttonValue model, Cmd.none )
+
+    else
+        ( model, Cmd.none )
+
+
+toggleSelectedBlocks : String -> Document -> Document
+toggleSelectedBlocks value document =
+    case document.selection of
+        Nothing ->
+            document
+
+        Just selection ->
+            let
+                ( before, selected, after ) =
+                    DocumentUtils.getSelectionBlocks selection document.nodes
+            in
+            { document
+                | nodes =
+                    before
+                        ++ List.map
+                            (\node ->
+                                { node
+                                    | nodeType =
+                                        if node.nodeType == value then
+                                            "div"
+
+                                        else
+                                            value
+                                }
+                            )
+                            selected
+                        ++ after
+            }
 
 
 toggleStyle : CharacterMetadata -> CharacterStyle -> CharacterMetadata
@@ -224,22 +265,6 @@ toggleStyle characterMetadata characterStyle =
 
 
 
--- Update the current style and current selection
-
-
-updateStyle : CharacterStyle -> Model -> ( Model, Cmd Msg )
-updateStyle characterStyle model =
-    let
-        newCurrentStyles =
-            toggleStyle model.currentStyles characterStyle
-
-        newModel =
-            { model | currentStyles = newCurrentStyles }
-    in
-    ( newModel, Cmd.none )
-
-
-
 -- VIEW
 
 
@@ -249,7 +274,7 @@ doOnBlur =
 
 view : Model -> Html Msg
 view model =
-    div [] [ editorView model, renderDocument model ]
+    div [] [ div [ Html.Attributes.class "rte-example" ] [ editorView model, renderDocument model ] ]
 
 
 selectionAttributesIfPresent : Maybe Selection -> List (Html.Attribute Msg)
@@ -280,10 +305,6 @@ renderDocumentNodeToHtml =
     editorNodeToHtml << documentNodeToEditorNode
 
 
-onTestEvent =
-    on "testevent" (D.succeed Noop)
-
-
 neverPreventDefault : msg -> ( msg, Bool )
 neverPreventDefault msg =
     ( msg, False )
@@ -308,15 +329,14 @@ onDocumentNodeChange =
 renderDocument : Document -> Html Msg
 renderDocument document =
     div
-        []
+        [ class "rte-container" ]
         [ Html.Keyed.node "div"
             [ contenteditable True
             , doOnBlur
             , onBeforeInput
-            , onTestEvent
             , HandleKeyDown.onKeyDown
             , onInput
-            , style "display" "inline-block"
+            , class "rte-main"
             , onCompositionEnd
             , onCopy
             , onDocumentNodeChange
@@ -325,11 +345,12 @@ renderDocument document =
             , onPasteWithData
             , onCompositionStart
             , attribute "data-rte" "true"
+            , attribute "autocorrect" "off"
+            , attribute "spellcheck" "false"
             , attribute "data-document-id" document.id
             ]
             [ -- hangulbuffer exists because in Firefox on MacOS, Korean IME sometimes puts characters in the beginning of the content editable
-              ( "hangulbuffer" ++ String.fromInt document.renderCount, Html.text "" )
-            , ( String.fromInt document.renderCount, div [] (List.map renderDocumentNodeToHtml document.nodes) )
+              ( String.fromInt document.renderCount, div [] (List.map renderDocumentNodeToHtml document.nodes) )
             ]
         , node "selection-state" (selectionAttributesIfPresent document.selection) []
         ]

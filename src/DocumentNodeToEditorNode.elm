@@ -1,13 +1,9 @@
 module DocumentNodeToEditorNode exposing (..)
 
 import Array
-import Dict exposing (Dict, insert)
+import Dict exposing (Dict)
 import Model exposing (..)
 import Set exposing (..)
-
-
-
--- for now, no custom styles. TODO: figure out what to do here.
 
 
 getNodeStyles : String -> Dict String String
@@ -15,13 +11,32 @@ getNodeStyles nodeType =
     Dict.empty
 
 
-
--- TODO: figure out what to do here as well
-
-
 getNodeType : String -> String
 getNodeType nodeType =
-    "div"
+    case nodeType of
+        "H1" ->
+            "h1"
+
+        "H2" ->
+            "h2"
+
+        "H3" ->
+            "h3"
+
+        "H4" ->
+            "h4"
+
+        "H5" ->
+            "h5"
+
+        "H6" ->
+            "h6"
+
+        "Blockquote" ->
+            "blockquote"
+
+        _ ->
+            "div"
 
 
 documentNodeToEditorNode : DocumentNode -> EditorNode
@@ -32,11 +47,6 @@ documentNodeToEditorNode documentNode =
         , styles = getNodeStyles documentNode.nodeType
         , nodeType = getNodeType documentNode.nodeType
         }
-
-
-
--- TODO: implement me!
--- YIKES this is really inefficient
 
 
 foldCharactersWithSameMetadata : ( Char, CharacterMetadata ) -> Array.Array ( String, CharacterMetadata ) -> Array.Array ( String, CharacterMetadata )
@@ -53,15 +63,20 @@ foldCharactersWithSameMetadata ( char, metadata ) agg =
                 Array.push ( String.fromChar char, metadata ) agg
 
 
-
--- TODO: implement me!
-
-
 characterMetadataFunc : String -> Dict String String -> Dict String String
 characterMetadataFunc style dict =
     case style of
         "Bold" ->
             Dict.insert "font-weight" "bold" dict
+
+        "Italic" ->
+            Dict.insert "font-style" "italic" dict
+
+        "Underline" ->
+            Dict.insert "text-decoration" "underline" dict
+
+        "Monospace" ->
+            Dict.insert "font-family" "monospace" dict
 
         _ ->
             dict

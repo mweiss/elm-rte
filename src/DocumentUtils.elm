@@ -723,9 +723,6 @@ insertAtSelection value document =
 
                 newDocument =
                     replaceSelected newNodes selection document
-
-                selectionDebug =
-                    Debug.log "selection debug" newDocument.selection
             in
             newDocument
 
@@ -740,3 +737,93 @@ addIdsToDocumentNodes nodes document =
     ( List.indexedMap (addIdToDocumentNode document.id document.idCounter) nodes
     , { document | idCounter = document.idCounter + List.length nodes }
     )
+
+
+setStylesOnSelection : CharacterMetadata -> Selection -> Document -> Document
+setStylesOnSelection styles selection document =
+    if selection.isCollapsed then
+        document
+
+    else
+        let
+            ( before, selected, after ) =
+                getSelectionBlocks selection document.nodes
+        in
+        case List.length selected of
+            0 ->
+                document
+
+            1 ->
+                let
+                    minOffset =
+                        min selection.focusOffset selection.anchorOffset
+
+                    maxOffset =
+                        max selection.focusOffset selection.anchorOffset
+
+                    newSelected =
+                        List.map
+                            (\node ->
+                                { node
+                                    | characterMetadata =
+                                        List.take minOffset node.characterMetadata
+                                            ++ List.repeat (maxOffset - minOffset) styles
+                                            ++ List.drop maxOffset node.characterMetadata
+                                }
+                            )
+                            selected
+
+                    newNodes =
+                        before ++ newSelected ++ after
+                in
+                { document | nodes = newNodes }
+
+            _ ->
+                case List.head selected of
+                    -- No way to reach this state, but I'm not sure the cleaner way
+                    Nothing ->
+                        document
+
+                    Just selectedStart ->
+                        case List.Extra.last selected of
+                            -- No way to reach this state, but I'm not sure the cleaner way
+                            Nothing ->
+                                document
+
+                            Just selectedEnd ->
+                                let
+                                    selectedStartOffset =
+                                        if selectedStart.id == selection.focusNode then
+                                            selection.focusOffset
+
+                                        else
+                                            selection.anchorOffset
+
+                                    selectedEndOffset =
+                                        if selectedEnd.id == selection.focusNode then
+                                            selection.focusOffset
+
+                                        else
+                                            selection.anchorOffset
+
+                                    newSelectedStart =
+                                        { selectedStart
+                                            | characterMetadata =
+                                                List.take selectedStartOffset selectedStart.characterMetadata
+                                                    ++ List.repeat (List.length selectedStart.characterMetadata - selectedStartOffset) styles
+                                        }
+
+                                    newSelectedEnd =
+                                        { selectedEnd
+                                            | characterMetadata =
+                                                List.repeat selectedEndOffset styles
+                                                    ++ List.drop selectedEndOffset selectedEnd.characterMetadata
+                                        }
+
+                                    rest =
+                                        List.drop 1 (List.take (List.length selected - 1) selected)
+
+                                    newRest =
+                                        List.map (\node -> { node | characterMetadata = List.repeat (List.length node.characterMetadata) styles }) rest
+                                in
+                                { document | nodes = before ++ [ newSelectedStart ] ++ newRest ++ [ newSelectedEnd ] ++ after }

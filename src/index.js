@@ -82,7 +82,8 @@ const updateSelectionToExpected = (expectedSelectionState) => {
     try {
       sel.setBaseAndExtent(anchorData.node, anchorData.offset, focusData.node, focusData.offset)
     } catch (e) {
-      // TODO: look into why selection state is sometimes incorrect
+      // TODO: The webcomponent updates attributes one by one, so sometimes the selection data
+      // is incorrect.  One way to fix is this to put all the selection data into one attribute
       console.log("Uh oh, the selection state was incorrect!" +
           "This maybe happens because attributes are stale on the web component?",  data, focusData, anchorData);
     }
@@ -121,7 +122,6 @@ document.addEventListener("selectionchange", (e) => {
     "focusNode": focusNode.id
   });
 });
-
 
 document.addEventListener("paste", (e) => {
   let node = e.target;
@@ -186,7 +186,8 @@ document.addEventListener("input", (e) => {
   // Since we really don't know what the difference is, we'll pass the new text to the editor and let
   // it resolve the difference.  Note that this probably will result in loss of style information since
   // the browser mangles the spans inside a document node, so it's unreliable to pass that information
-  // to the editor.
+  // to the editor.  However, there's definitely a way to do this so we lose *less* style information,
+  // since this will currently wipe out the entire block's style attributes.
 
   if (!e.target || !e.target.dataset || !e.target.dataset.documentId) {
     return;
@@ -195,6 +196,7 @@ document.addEventListener("input", (e) => {
   if (!selection || !selection.anchorNode) {
     return;
   }
+  registerObserver(e.target);
 
   const anchorNode = findDocumentNodeId(selection.anchorNode);
   let node = selectDocumentNodeById(anchorNode.id);
@@ -202,7 +204,6 @@ document.addEventListener("input", (e) => {
     return;
   }
   let text = deriveTextFromDocumentNode(node);
-  console.log("Derived text", text);
   let event = new CustomEvent("documentnodechange", {
     detail: {
       node: anchorNode.id, text: text
@@ -236,3 +237,28 @@ if (IS_FIREFOX) {
     }
   });
 }
+
+
+// ---
+// HACK: Sometimes, a text node will be inserted at very beginning of the contenteditable
+// and the VirtualDOM implementation in Elm doesn't validate that the previous DOM state is the same
+// as what it thought it was before, so it'll constantly throw an exception as it tries to re-render.
+
+// This observer tries to fix this by scanning the editor on every change and remove any top level text
+// nodes if they exist.
+const observers = {};
+const registerObserver = (node) => {
+  if (node && node.dataset && node.dataset.documentId && !observers[node.dataset.documentId]) {
+    const config = { attributes: true, childList: true, subtree: true };
+    const callback = function(mutationsList, observer) {
+      for (let childNode of node.childNodes) {
+        if (childNode.nodeType === Node.TEXT_NODE) {
+          childNode.remove();
+        }
+      }
+    };
+    const observer = new MutationObserver(callback);
+    observer.observe(node, config);
+    observers[node.dataset.documentId] = observer;
+  }
+};

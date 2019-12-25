@@ -26,9 +26,14 @@ onBeforeInput =
 -- For now, never prevent the default from happening... actually we should not even
 
 
-neverPreventDefault : msg -> ( msg, Bool )
+neverPreventDefault : Msg -> ( Msg, Bool )
 neverPreventDefault msg =
-    ( msg, False )
+    case msg of
+        OnBeforeInput i ->
+            ( msg, False )
+
+        _ ->
+            ( msg, False )
 
 
 

@@ -16,7 +16,7 @@ preventDefaultOnKeydown : Msg -> ( Msg, Bool )
 preventDefaultOnKeydown msg =
     case msg of
         OnKeyDown keypress ->
-            if Debug.log "iscomposing keypress" keypress.isComposing then
+            if keypress.isComposing then
                 ( msg, False )
 
             else
