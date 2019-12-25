@@ -64,7 +64,7 @@ type alias Model =
 
 initialText : String
 initialText =
-    "Write something here..."
+    "A beginning is a very delicate time. Know then, that is is the year 10191. The known universe is ruled by the Padishah Emperor Shaddam the Fourth, my father. In this time, the most precious substance in the universe is the spice Melange."
 
 
 initialDocumentNodes : List DocumentNode
