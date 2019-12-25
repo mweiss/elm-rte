@@ -1,14 +1,31 @@
 module DocumentNodeToEditorNode exposing (..)
 
+{-
+   This module converts DocumentNodes to an intermediary format, EditorNodes.  This helps conceptually
+   render it to HTML since going directly from document nodes to html requires a lot more steps.
+-}
+
 import Array
 import Dict exposing (Dict)
 import Model exposing (..)
 import Set exposing (..)
 
 
+
+{-
+   Currently we have no specific styles for document nodes.
+-}
+
+
 getNodeStyles : String -> Dict String String
 getNodeStyles nodeType =
     Dict.empty
+
+
+
+{-
+   This method derives the html node type from the documentNode node type.
+-}
 
 
 getNodeType : String -> String

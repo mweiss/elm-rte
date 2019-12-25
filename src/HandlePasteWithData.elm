@@ -1,5 +1,10 @@
 module HandlePasteWithData exposing (..)
 
+{-
+   This module deals with the custom pastewithdata event which contains the text and html data of the clipboard,
+   which we then parse and insert into the document if applicable.  Currently, only text parsing has been implemented.
+-}
+
 import DocumentUtils
 import Model exposing (..)
 

@@ -1,19 +1,15 @@
--- Press buttons to increment and decrement a counter.
---
--- Read how it works:
---   https://guide.elm-lang.org/architecture/buttons.html
---
-
-
 port module Main exposing (updateSelection)
 
-import BasicEditor exposing (editorView)
+{- | The main module for the Elm rich text editor.  This implements a prototype contenteditable
+   rich text editor with most of the logic done in Elm.
+-}
+
+import BasicEditorControls exposing (editorView)
 import Browser
-import Debug as Debug
 import DocumentNodeToEditorNode exposing (..)
 import DocumentUtils
 import EditorNodeToHtml exposing (..)
-import HandleBeforeInput exposing (handleBeforeInput, onBeforeInput)
+import HandleBeforeInput exposing (beforeInputDecoder, handleBeforeInput)
 import HandleCompositionEnd exposing (handleCompositionEnd)
 import HandleCompositionStart exposing (handleCompositionStart)
 import HandleCut exposing (handleCut)
@@ -39,6 +35,10 @@ main =
     Browser.element { init = init, view = view, update = update, subscriptions = subscribe }
 
 
+{-| Decoder for a selection object. Note that anchorNode and focusNode are DocumentNode ids, and the
+anchorOffset and focusOffset have been modified from the original Selection API to account for
+span offsets created when styling the text.
+-}
 selectionDecoder : D.Decoder Selection
 selectionDecoder =
     D.map7 Selection
@@ -55,21 +55,26 @@ port updateSelection : (E.Value -> msg) -> Sub msg
 
 
 
--- MODEL
+--- MODEL
 
 
 type alias Model =
     Document
 
 
-initialText : String
-initialText =
-    "A beginning is a very delicate time. Know then, that is is the year 10191. The known universe is ruled by the Padishah Emperor Shaddam the Fourth, my father. In this time, the most precious substance in the universe is the spice Melange."
+initialText1 : String
+initialText1 =
+    "This is editable plain text.  Here's a quote from Dune:"
+
+
+initialText2 : String
+initialText2 =
+    "A beginning is a very delicate time. Know then, that it is the year 10191. The known universe is ruled by the Padishah Emperor Shaddam the Fourth, my father. In this time, the most precious substance in the universe is the spice Melange."
 
 
 initialDocumentNodes : List DocumentNode
 initialDocumentNodes =
-    [ DocumentNode "documentNode0" (repeat (length initialText) emptyCharacterMetadata) initialText "" ]
+    [ DocumentNode "documentNode0" (repeat (length initialText1) emptyCharacterMetadata) initialText1 "div", DocumentNode "documentNode1" (repeat (length initialText2) emptyCharacterMetadata) initialText2 "Blockquote" ]
 
 
 initialDocument : Document
@@ -118,10 +123,6 @@ updateOnRandom uuid model =
     ( { model | id = Uuid.toString uuid }, Cmd.none )
 
 
-
--- TODO parse selection in Elm instead of JS
-
-
 updateOnSelection : E.Value -> Model -> ( Model, Cmd Msg )
 updateOnSelection selectionValue model =
     if model.isComposing then
@@ -149,16 +150,20 @@ update msg model =
         OnRandom uuid ->
             updateOnRandom uuid model
 
-        OnCopy v ->
+        OnCopy ->
             -- Let the default behavior occur because there doesn't seem a way to be able to manipulate
-            -- the clipboard data
+            -- the clipboard data with Elm
             ( model, Cmd.none )
 
         OnCut ->
-            -- Let the default behavior occur, but delete the selection and force a rerender
+            -- Let the default cut behavior occur, but also delete the selection in the model
+            -- and force a complete rerender since the state could have changed dramatically.
             ( handleCut model, Cmd.none )
 
         OnPaste ->
+            -- Let the default behavior occur because there doesn't seem a way to be able to manipulate
+            -- the clipboard data with Elm.  Instead we'll use the custom event pastewithdata
+            -- to determine what we can paste.
             ( model, Cmd.none )
 
         OnPasteWithData v ->
@@ -305,13 +310,8 @@ renderDocumentNodeToHtml =
     editorNodeToHtml << documentNodeToEditorNode
 
 
-neverPreventDefault : msg -> ( msg, Bool )
-neverPreventDefault msg =
-    ( msg, False )
-
-
 onCopy =
-    preventDefaultOn "copy" (D.map neverPreventDefault (D.map OnCopy D.value))
+    on "copy" (D.succeed OnCopy)
 
 
 onPaste =
@@ -324,6 +324,22 @@ onCut =
 
 onDocumentNodeChange =
     on "documentnodechange" decodeDocumentNodeChange
+
+
+onBeforeInput =
+    on "beforeinput" beforeInputDecoder
+
+
+
+-- TODO: Implement drag/drop.  For now, we'll disable anything related to drag/drop
+
+
+onDrag =
+    preventDefaultOn "drag" (D.succeed ( Noop, True ))
+
+
+onDrop =
+    preventDefaultOn "drop" (D.succeed ( Noop, True ))
 
 
 renderDocument : Document -> Html Msg
@@ -339,6 +355,8 @@ renderDocument document =
             , class "rte-main"
             , onCompositionEnd
             , onCopy
+            , onDrag
+            , onDrop
             , onDocumentNodeChange
             , onPaste
             , onCut
@@ -349,8 +367,7 @@ renderDocument document =
             , attribute "spellcheck" "false"
             , attribute "data-document-id" document.id
             ]
-            [ -- hangulbuffer exists because in Firefox on MacOS, Korean IME sometimes puts characters in the beginning of the content editable
-              ( String.fromInt document.renderCount, div [] (List.map renderDocumentNodeToHtml document.nodes) )
+            [ ( String.fromInt document.renderCount, div [] (List.map renderDocumentNodeToHtml document.nodes) )
             ]
         , node "selection-state" (selectionAttributesIfPresent document.selection) []
         ]

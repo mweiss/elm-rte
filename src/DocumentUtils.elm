@@ -1,11 +1,26 @@
 module DocumentUtils exposing (..)
 
+{-
+
+   This module is a catch all for utilities for manipulating a document.  A lot of the code in this module
+   could be refactored somewhere else.  Also, some of these methods with a little thought could be consolidated
+   since the logic is somewhat similar (replace, delete, set all use similar traversal logic).
+
+-}
+
 import DeleteWord
 import List exposing (repeat)
 import List.Extra
 import Model exposing (..)
 import Regex
 import String exposing (length)
+
+
+
+{-
+   Returns a tuple of (before, selected, after) given a selection object.  This is a very useful
+   utility for manipulating a selection in a document.
+-}
 
 
 getSelectionBlocks : Selection -> List DocumentNode -> ( List DocumentNode, List DocumentNode, List DocumentNode )
@@ -15,6 +30,13 @@ getSelectionBlocks selection documentNodes =
 
     else
         getSelectionRangeBlocks selection documentNodes
+
+
+
+{-
+   Finds a single node in a list of document nodes and returns a (before, selected, after) tuple
+   of nodes.  selected is always of length 1 if the node exists.
+-}
 
 
 getSelectionSingleBlock : String -> List DocumentNode -> ( List DocumentNode, List DocumentNode, List DocumentNode )
@@ -29,6 +51,13 @@ getSelectionSingleBlock nodeId documentNodes =
             List.Extra.splitAt 1 after
     in
     ( before, found, end )
+
+
+
+{-
+   Finds a list of selected nodes in a list of document nodes and returns a (before, selected, after) tuple
+   of nodes.  selected is always of length 1 if the node exists.
+-}
 
 
 getSelectionRangeBlocks : Selection -> List DocumentNode -> ( List DocumentNode, List DocumentNode, List DocumentNode )
@@ -74,7 +103,10 @@ getSelectionRangeBlocks selection documentNodes =
 
 
 
--- This should only be called when the list is larger than 1
+{-
+   Splits a block (as a result of enter or return).  This should only be called if the selected documentNodes
+   is larger than 1, otherwise the logic is a bit off.
+-}
 
 
 splitSelectedRange : Selection -> List DocumentNode -> List DocumentNode
@@ -120,6 +152,13 @@ splitSelectedRange selection documentNodes =
                     [ { firstNode | text = newFirstText }, { lastNode | text = newLastText } ]
 
 
+
+{-
+   Splits a single block (as a result of enter or return).  This is used when the selection
+   is only for one block.
+-}
+
+
 splitSelectSingle : String -> Selection -> List DocumentNode -> List DocumentNode
 splitSelectSingle newId selection documentNodes =
     case List.head documentNodes of
@@ -152,11 +191,10 @@ splitSelectSingle newId selection documentNodes =
 
 
 
--- Run through the cases
--- Delete collapsed
--- Delete selection
--- Delete word
--- Delete line
+{-
+   Deletes the text at the given selection.  Note that delete will remove the forward character if the
+   selection is collapsed.
+-}
 
 
 delete : Selection -> Document -> Document
@@ -166,6 +204,13 @@ delete selection document =
 
     else
         removeSelected selection document
+
+
+
+{-
+   Deletes the forward most character in a block, or collapses the block if the offset is at the
+   end of a block.
+-}
 
 
 deleteCollapsed : String -> Int -> Document -> Document
@@ -223,6 +268,13 @@ deleteCollapsed nodeId offset document =
             { document | nodes = newNodeList, selection = newSelection }
 
 
+
+{-
+   Deletes the text at the given selection.  Note that delete will remove the forward most word if the
+   selection is collapsed.
+-}
+
+
 deleteWord : Selection -> Document -> Document
 deleteWord selection document =
     if selection.isCollapsed then
@@ -230,6 +282,13 @@ deleteWord selection document =
 
     else
         removeSelected selection document
+
+
+
+{-
+   Deletes the forward most word in a block, or collapses the block if the offset is at the
+   end of a block.
+-}
 
 
 deleteWordCollapsed : String -> Int -> Document -> Document
@@ -280,9 +339,10 @@ deleteWordCollapsed nodeId offset document =
                 { document | nodes = newNodes, selection = newSelection }
 
 
-deleteToEndOfBlock : Selection -> Document -> Document
-deleteToEndOfBlock selection document =
-    document
+
+{-
+   Removes the text and character metadata of a document node at the given offsets.
+-}
 
 
 removeRange : Int -> Int -> DocumentNode -> DocumentNode
@@ -295,6 +355,13 @@ removeRange start end documentNode =
             List.take start documentNode.characterMetadata ++ List.drop end documentNode.characterMetadata
     in
     { documentNode | text = newText, characterMetadata = newCharacterMetadata }
+
+
+
+{-
+   Applies backspace logic to the character at the node at offset.  Merges a block with the previous one
+   if the offset is at the beginning of a block.
+-}
 
 
 backspaceCollapsed : String -> Int -> Document -> Document
@@ -352,6 +419,16 @@ backspaceCollapsed nodeId offset document =
             { document | nodes = newNodeList, selection = newSelection }
 
 
+
+{-
+   Replace selected updates the selection with the contents of the document node list.  Note
+   that the first document node will be merged in with the selection, and if it spans multiple
+   blocks, the last node in the selection will be merged in with the nodes to replace.  The document
+   nodes must already have ids set on them (unless they're length 1, in which it doesn't matter
+   because it will be merged into an existing node).
+-}
+
+
 replaceSelected : List DocumentNode -> Selection -> Document -> Document
 replaceSelected replaceNodes selection document =
     let
@@ -390,7 +467,10 @@ replaceSelected replaceNodes selection document =
 
 
 
--- handle case where list is one
+{-
+   replaceRange updates a single document node with the new inserted text at the start and end
+   offset.  This handles the case where the selection is within a single node.
+-}
 
 
 replaceRange : List DocumentNode -> DocumentNode -> Int -> Int -> ( List DocumentNode, Selection )

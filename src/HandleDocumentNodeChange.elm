@@ -1,5 +1,10 @@
 module HandleDocumentNodeChange exposing (..)
 
+{-
+   This module handles the cust documentnodechange event which is a catch all event for spellcheck and
+   autocorrect events that we only ever get notified of after they've been applied.
+-}
+
 import Json.Decode as D
 import List.Extra
 import Model exposing (..)
@@ -15,8 +20,11 @@ decodeDocumentNodeChange =
 
 
 
--- TODO, this will clear style data, but I think it can be done in a way that's somewhat intelligent
--- about preserving the style it can
+{- This will clear style data almost always. I think it can be done in a way that's somewhat intelligent
+   about preserving the style it can.  Right now we do something really dumb and unsubtle... we
+   compare the DOM text with the model's text, and if it's
+   different, we replace the text with what's in the DOM.
+-}
 
 
 handleDocumentNodeChange : DocumentNodeChange -> Document -> Document

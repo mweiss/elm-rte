@@ -1,5 +1,9 @@
 module EditorNodeToHtml exposing (..)
 
+{-
+   This module holds functions which turns the intermediary format EditorNode into HTML.
+-}
+
 import Dict exposing (Dict, toList)
 import Html exposing (..)
 import Html.Attributes exposing (..)

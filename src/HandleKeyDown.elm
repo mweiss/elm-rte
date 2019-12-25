@@ -1,5 +1,11 @@
 module HandleKeyDown exposing (handleKeyDown, keyDownDecoder, onKeyDown)
 
+{-
+   This module handles user actions like backspace, delete, enter, as well in the future commands
+   like undo, redo, or any hot keys.  We handle these type of actions through the keydown event,
+   while input is handled mostly through the beforeinput event.
+-}
+
 import DocumentUtils exposing (backspace, backspaceWord, delete, deleteWord, splitBlock)
 import Html
 import Html.Events exposing (preventDefaultOn)
@@ -57,12 +63,6 @@ keyDownDecoder =
         (D.field "metaKey" D.bool)
         (D.field "ctrlKey" D.bool)
         (D.oneOf [ D.field "isComposing" D.bool, D.succeed False ])
-
-
-
--- Handle key codes
--- RETURN, DELETE, TAB, BACKSPACE, UP, DOWN, LEFT, RIGHT, SHIFT, CAPSLOCK, ALT, OPTION, COMMAND, CTRL,
--- TODO: implement me!
 
 
 handleEnter : Document -> Selection -> ( Document, Cmd Msg )

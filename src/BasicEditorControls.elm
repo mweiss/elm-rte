@@ -1,4 +1,4 @@
-module BasicEditor exposing (..)
+module BasicEditorControls exposing (..)
 
 import DocumentUtils
 import Html exposing (Html, div, span, text)
@@ -21,7 +21,7 @@ isSelectedBlock action document =
 
         Just selection ->
             let
-                ( before, selected, after ) =
+                ( _, selected, _ ) =
                     DocumentUtils.getSelectionBlocks selection document.nodes
             in
             List.length selected > 0 && not (List.any (\x -> x.nodeType /= action) selected)
@@ -68,7 +68,3 @@ editorPanel document =
                 [ "Bold", "Italic", "Underline", "Monospace" ]
             )
         ]
-
-
-
--- TODO create buttons for H1 H2… etc, buttons, also create text fields

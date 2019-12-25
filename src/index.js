@@ -2,7 +2,12 @@ import './main.css';
 import { Elm } from './Main.elm';
 import * as serviceWorker from './serviceWorker';
 
-// Testing web component -- will probably need polymer to use correctly
+/**
+ * The SelectionState web component updates itself with the latest selection state, and also sets
+ * the selection state whenever its attributes have been updated.  This is very useful for syncronizing
+ * the selection state with what Elm thinks the selection state is, and seems to be the only way of making
+ * sure the VirtualDOM has been updated already with the latest state before updating the selection state.
+ */
 class SelectionState extends HTMLElement {
   static get observedAttributes() {
     return ["focus-offset", "anchor-offset", "anchor-node",
@@ -38,6 +43,10 @@ const app = Elm.Main.init({
 serviceWorker.unregister();
 
 
+/**
+ * This is a helper method that will find the Selection API offset (e.g. the real DOM offset)
+ * of a node given the document node and model offset.
+ */
 const offsetAndNode = (node, offset) => {
   let prevNode = null;
   let prevOffset = 0;
@@ -61,6 +70,10 @@ const selectDocumentNodeById = (id) => {
   return document.querySelector(`[data-document-node-id="${id}"]`)
 };
 
+/**
+ * This method updates the selection state to the expected selection state.  It's used primarily
+ * by the webcomponent to synchronize the selection state with what Elm thinks it should be.
+ */
 const updateSelectionToExpected = (expectedSelectionState) => {
   if (expectedSelectionState) {
     const data = expectedSelectionState;
@@ -108,6 +121,10 @@ const findDocumentNodeId = (node) => {
   return {offset, id}
 };
 
+/**
+ * Whenever the selection changes, we need to tell Elm that it has updated.  Note that we translate
+ * the selection so that it matches the Elm's DocumentNode model.
+ */
 document.addEventListener("selectionchange", (e) => {
   const selection = getSelection();
   const anchorNode = findDocumentNodeId(selection.anchorNode);
@@ -123,6 +140,11 @@ document.addEventListener("selectionchange", (e) => {
   });
 });
 
+/**
+ * The paste event only allows us to access the clipboard when we're handling the event, which means
+ * that getting this information in Elm is quite tricky.  To work around this issue, we create
+ * a new 'pastewithdata' custom event that has the clipboard data as part of the event details.
+ */
 document.addEventListener("paste", (e) => {
   let node = e.target;
 
@@ -149,10 +171,12 @@ document.addEventListener("paste", (e) => {
     }
   });
   e.preventDefault();
-  console.log(node, newEvent);
   node.dispatchEvent(newEvent)
 });
 
+/**
+ * This is a helper method that tries to figure out the text of a document node.
+ */
 const deriveTextFromDocumentNode = (node) => {
   if (node.nodeType === Node.TEXT_NODE) {
     return (node.nodeValue || "")
@@ -167,6 +191,11 @@ const deriveTextFromDocumentNode = (node) => {
   return value;
 };
 
+/**
+ * This flag is used to keep track of if we're in composing state or not.  It's useful when simulating
+ * the beforeinput event, as well as ignoring input events on composition.
+ * @type {boolean}
+ */
 let isComposing = false;
 document.addEventListener("compositionstart", (e) => {
   isComposing = true
