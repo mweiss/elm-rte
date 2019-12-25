@@ -17,13 +17,13 @@ import HandleDocumentNodeChange exposing (decodeDocumentNodeChange, handleDocume
 import HandleKeyDown exposing (handleKeyDown)
 import HandlePasteWithData exposing (handlePasteWithData)
 import Html exposing (Html, div, node)
-import Html.Attributes exposing (attribute, class, contenteditable, style)
+import Html.Attributes exposing (attribute, class, contenteditable)
 import Html.Events exposing (on, onBlur, preventDefaultOn)
 import Html.Keyed
 import Json.Decode as D
 import Json.Encode as E
 import List exposing (repeat)
-import Model exposing (CharacterMetadata, CharacterStyle, Document, DocumentNode, DocumentNodeType, Keypress, Msg(..), PasteWithData, Selection, emptyCharacterMetadata)
+import Model exposing (CharacterMetadata, CharacterStyle, Document, DocumentNode, Keypress, Msg(..), PasteWithData, Selection, emptyCharacterMetadata)
 import Random
 import Set exposing (Set)
 import String exposing (length)
