@@ -1,9 +1,10 @@
 module BasicEditorControls exposing (..)
 
 import DocumentUtils
-import Html exposing (Html, div, span, text)
+import Html exposing (Attribute, Html, div, span, text)
 import Html.Attributes exposing (class)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, preventDefaultOn)
+import Json.Decode exposing (succeed)
 import Model exposing (Document, Msg(..))
 import Set
 
@@ -32,6 +33,11 @@ isCurrentStyle action document =
     Set.member action document.currentStyles.styles
 
 
+onButtonPress : String -> Attribute Msg
+onButtonPress action =
+    preventDefaultOn "click" (succeed ( OnButtonPress action, True ))
+
+
 createButton : Document -> Bool -> String -> Html Msg
 createButton document isBlockAction action =
     let
@@ -43,7 +49,7 @@ createButton document isBlockAction action =
                 isCurrentStyle action document
     in
     span
-        ([ onClick (OnButtonPress action), class "rte-button" ]
+        ([ onButtonPress action, class "rte-button" ]
             ++ (if selected then
                     [ class "rte-button-selected" ]
 

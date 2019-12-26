@@ -239,7 +239,8 @@ toggleSelectedBlocks value document =
                     DocumentUtils.getSelectionBlocks selection document.nodes
             in
             { document
-                | nodes =
+                | renderCount = document.renderCount + 1
+                , nodes =
                     before
                         ++ List.map
                             (\node ->
@@ -282,26 +283,31 @@ view model =
     div [] [ div [ Html.Attributes.class "rte-example" ] [ editorView model, renderDocument model ] ]
 
 
-selectionAttributesIfPresent : Maybe Selection -> List (Html.Attribute Msg)
-selectionAttributesIfPresent s =
-    case s of
+selectionAttributesIfPresent : Document -> List (Html.Attribute Msg)
+selectionAttributesIfPresent d =
+    case d.selection of
         Nothing ->
             []
 
         Just selection ->
-            [ attribute "focus-offset" (String.fromInt selection.focusOffset)
-            , attribute "anchor-offset" (String.fromInt selection.anchorOffset)
-            , attribute "anchor-node" selection.anchorNode
-            , attribute "focus-node" selection.focusNode
-            , attribute "is-collapsed"
-                (if selection.isCollapsed then
-                    "true"
+            [ attribute "selection"
+                (String.join ","
+                    [ "focus-offset=" ++ String.fromInt selection.focusOffset
+                    , "anchor-offset=" ++ String.fromInt selection.anchorOffset
+                    , "anchor-node=" ++ selection.anchorNode
+                    , "focus-node=" ++ selection.focusNode
+                    , "is-collapsed="
+                        ++ (if selection.isCollapsed then
+                                "true"
 
-                 else
-                    "false"
+                            else
+                                "false"
+                           )
+                    , "range-count=" ++ String.fromInt selection.rangeCount
+                    , "selection-type=" ++ selection.selectionType
+                    , "render-count=" ++ String.fromInt d.renderCount
+                    ]
                 )
-            , attribute "range-count" (String.fromInt selection.rangeCount)
-            , attribute "selection-type" selection.selectionType
             ]
 
 
@@ -369,7 +375,7 @@ renderDocument document =
             ]
             [ ( String.fromInt document.renderCount, div [] (List.map renderDocumentNodeToHtml document.nodes) )
             ]
-        , node "selection-state" (selectionAttributesIfPresent document.selection) []
+        , node "selection-state" (selectionAttributesIfPresent document) []
         ]
 
 

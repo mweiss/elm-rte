@@ -11,6 +11,7 @@ import Html
 import Html.Events exposing (preventDefaultOn)
 import Json.Decode as D
 import Model exposing (..)
+import Set
 
 
 onKeyDownDecoder : D.Decoder Msg
@@ -27,6 +28,9 @@ preventDefaultOnKeydown msg =
 
             else
                 case keypress.key of
+                    "b" ->
+                        ( msg, keypress.metaKey )
+
                     "Backspace" ->
                         ( msg, True )
 
@@ -99,6 +103,11 @@ handleDeleteWord model selection =
     ( deleteWord selection model, Cmd.none )
 
 
+handleBold : Document -> Selection -> ( Document, Cmd Msg )
+handleBold model selection =
+    ( DocumentUtils.setStylesOnSelection { styles = Set.fromList [ "Bold" ] } selection model, Cmd.none )
+
+
 handleKeyDown : Keypress -> Document -> ( Document, Cmd Msg )
 handleKeyDown keypress model =
     case model.selection of
@@ -111,6 +120,13 @@ handleKeyDown keypress model =
 
             else
                 case keypress.key of
+                    "b" ->
+                        if keypress.metaKey then
+                            handleBold model selection
+
+                        else
+                            ( model, Cmd.none )
+
                     "Backspace" ->
                         if keypress.ctrlKey then
                             handleBackspaceWord model selection

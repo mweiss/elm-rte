@@ -10,15 +10,25 @@ import * as serviceWorker from './serviceWorker';
  */
 class SelectionState extends HTMLElement {
   static get observedAttributes() {
-    return ["focus-offset", "anchor-offset", "anchor-node",
-      "focus-node", "is-collapsed", "range-count", "selection-type"];
+    return ["selection"];
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
-    const focusOffset = Number(this.getAttribute("focus-offset"));
-    const focusNode = this.getAttribute("focus-node");
-    const anchorOffset = Number(this.getAttribute("anchor-offset"));
-    const anchorNode = this.getAttribute("anchor-node");
+
+    // It's a bit hacky, but every selection field is in one attribute to allow atomic
+    // selection updates.  The fields are in the form (key1=value1,key2=value2,...)
+    let selection = this.getAttribute("selection");
+    let selectionObj = {};
+    for (let pair of selection.split(",")) {
+      let splitPair = pair.split("=");
+      if (splitPair.length === 2) {
+        selectionObj[splitPair[0]] = splitPair[1]
+      }
+    }
+    const focusOffset = Number(selectionObj["focus-offset"]);
+    const focusNode = selectionObj["focus-node"];
+    const anchorOffset = Number(selectionObj["anchor-offset"]);
+    const anchorNode = selectionObj["anchor-node"];
 
     if (focusNode && anchorNode) {
       updateSelectionToExpected({
@@ -95,8 +105,6 @@ const updateSelectionToExpected = (expectedSelectionState) => {
     try {
       sel.setBaseAndExtent(anchorData.node, anchorData.offset, focusData.node, focusData.offset)
     } catch (e) {
-      // TODO: The webcomponent updates attributes one by one, so sometimes the selection data
-      // is incorrect.  One way to fix is this to put all the selection data into one attribute
       console.log("Uh oh, the selection state was incorrect!" +
           "This maybe happens because attributes are stale on the web component?",  data, focusData, anchorData);
     }
@@ -127,6 +135,7 @@ const findDocumentNodeId = (node) => {
  */
 document.addEventListener("selectionchange", (e) => {
   const selection = getSelection();
+  console.log('selectionchange', selection.anchorNode, selection.anchorOffset);
   const anchorNode = findDocumentNodeId(selection.anchorNode);
   const focusNode = findDocumentNodeId(selection.focusNode);
   app.ports.updateSelection.send({

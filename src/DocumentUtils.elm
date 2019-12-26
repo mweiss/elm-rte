@@ -856,7 +856,7 @@ setStylesOnSelection styles selection document =
                     newNodes =
                         before ++ newSelected ++ after
                 in
-                { document | nodes = newNodes }
+                { document | renderCount = document.renderCount + 1, nodes = newNodes }
 
             _ ->
                 case List.head selected of
@@ -906,4 +906,4 @@ setStylesOnSelection styles selection document =
                                     newRest =
                                         List.map (\node -> { node | characterMetadata = List.repeat (List.length node.characterMetadata) styles }) rest
                                 in
-                                { document | nodes = before ++ [ newSelectedStart ] ++ newRest ++ [ newSelectedEnd ] ++ after }
+                                { document | renderCount = document.renderCount + 1, nodes = before ++ [ newSelectedStart ] ++ newRest ++ [ newSelectedEnd ] ++ after }
