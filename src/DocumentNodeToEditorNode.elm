@@ -63,6 +63,7 @@ documentNodeToEditorNode documentNode =
         , childNodes = createChildNodes documentNode
         , styles = getNodeStyles documentNode.nodeType
         , nodeType = getNodeType documentNode.nodeType
+        , documentNodeType = documentNode.nodeType
         }
 
 
@@ -116,7 +117,7 @@ charactersToNodes id ( text, characterMetadata ) agg =
                     0
     in
     Array.push
-        (LeafEditorNode { offset = offset, text = text, styles = characterMetadataToStyles characterMetadata, id = id })
+        (LeafEditorNode { offset = offset, text = text, styles = characterMetadataToStyles characterMetadata, characterMetadata = characterMetadata, id = id })
         agg
 
 

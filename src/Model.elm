@@ -22,12 +22,14 @@ type EditorNode
         { id : String
         , childNodes : List EditorNode
         , styles : Dict String String
+        , documentNodeType : String
         , nodeType : String
         }
     | LeafEditorNode
         { offset : Int
         , styles : Dict String String
         , text : String
+        , characterMetadata : CharacterMetadata
         , id : String
         }
 
@@ -136,11 +138,41 @@ type alias PasteWithData =
 
 
 
-{- A documentnodechange event object -}
+{- These are objects related to documentnodechange events -}
+
+
+type alias OffsetAndMetadata =
+    { range : Range
+    , metadata : List String
+    }
+
+
+type alias Range =
+    { start : Int
+    , end : Int
+    }
+
+
+type alias Siblings =
+    { prev : Maybe String
+    , next : Maybe String
+    }
+
+
+type alias NodeInfo =
+    { id : String
+    , offsetsAndMetadata : List OffsetAndMetadata
+    , text : String
+    , nodeType : String
+    , siblings : Siblings
+    }
 
 
 type alias DocumentNodeChange =
-    { node : String, text : String }
+    { updatedOrAdded : List NodeInfo
+    , removed : List String
+    , forceRerender : Bool
+    }
 
 
 type Msg

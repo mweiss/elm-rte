@@ -2,6 +2,45 @@ import './main.css';
 import { Elm } from './Main.elm';
 import * as serviceWorker from './serviceWorker';
 
+
+class ElmEditor extends HTMLElement {
+  constructor() {
+    super();
+
+    this._observer = new MutationObserver(this.mutationObserverCallback.bind(this))
+  }
+
+  mutationObserverCallback(mutationsList, observer) {
+
+    let changes = gatherInformationFromMutations(mutationsList);
+    console.log('mutationObserverCallback', mutationsList, changes);
+    if (changes.updatedOrAdded.length === 0 &&
+        !changes.forceRerender &&
+        changes.removed.length === 0) {
+      return;
+    }
+    let event = new CustomEvent("documentnodechange", {
+      detail: changes
+    });
+    this.dispatchEvent(event)
+
+  }
+
+  connectedCallback() {
+    this._observer.observe(this, { characterDataOldValue: true, attributeOldValue: true, attributes: true, childList: true, subtree: true, characterData: true })
+  }
+
+  disconnectedCallback() {
+    this._observer.disconnect();
+  }
+
+  adpotedCallback() {
+    // TODO: do something?
+  }
+}
+
+customElements.define('elm-editor', ElmEditor);
+
 /**
  * The SelectionState web component updates itself with the latest selection state, and also sets
  * the selection state whenever its attributes have been updated.  This is very useful for syncronizing
@@ -13,11 +52,7 @@ class SelectionState extends HTMLElement {
     return ["selection"];
   }
 
-  attributeChangedCallback(name, oldValue, newValue) {
-
-    // It's a bit hacky, but every selection field is in one attribute to allow atomic
-    // selection updates.  The fields are in the form (key1=value1,key2=value2,...)
-    let selection = this.getAttribute("selection");
+  attributeChangedCallback(name, oldValue, selection) {
     let selectionObj = {};
     for (let pair of selection.split(",")) {
       let splitPair = pair.split("=");
@@ -116,17 +151,20 @@ const updateSelectionToExpected = (expectedSelectionState) => {
 const findDocumentNodeId = (node) => {
   let offset = 0;
   let id = "";
+  let documentOffsetNode = null, documentNode = null;
   while (node && node.tagName !== "BODY") {
     if (node.dataset && node.dataset.documentNodeOffset) {
-      offset = Number(node.dataset.documentNodeOffset)
+      offset = Number(node.dataset.documentNodeOffset);
+      documentOffsetNode = node
     }
     if (node.dataset && node.dataset.documentNodeId) {
       id = node.dataset.documentNodeId;
+      documentNode = node;
       break;
     }
     node = node.parentNode
   }
-  return {offset, id}
+  return {offset, id, documentOffsetNode, documentNode}
 };
 
 /**
@@ -135,7 +173,6 @@ const findDocumentNodeId = (node) => {
  */
 document.addEventListener("selectionchange", (e) => {
   const selection = getSelection();
-  console.log('selectionchange', selection.anchorNode, selection.anchorOffset);
   const anchorNode = findDocumentNodeId(selection.anchorNode);
   const focusNode = findDocumentNodeId(selection.focusNode);
   app.ports.updateSelection.send({
@@ -183,21 +220,171 @@ document.addEventListener("paste", (e) => {
   node.dispatchEvent(newEvent)
 });
 
+const gatherInformationFromMutations = (mutationList) => {
+  let processedDocumentNodes = [];
+  let info = {
+    updatedOrAdded: [],
+    removed: [],
+    forceRerender: false
+  };
+
+  const isExamined = (documentNode) => {
+    for (let node of processedDocumentNodes) {
+      if (node === documentNode) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const addToUpdatedOrAdded = (documentNode) => {
+    let data = deriveDataFromDocumentNode(documentNode);
+    let siblings = findPreviousAndNextSiblingDocumentNodeId(documentNode);
+
+    info.updatedOrAdded.push({
+      id: (documentNode.dataset && documentNode.dataset.documentNodeId) || "",
+      text: data.text,
+      offsetsAndMetadata: data.offsetsAndMetadata || [],
+      siblings: siblings,
+      nodeType: data.nodeType
+    });
+
+    if (!(documentNode.dataset && documentNode.dataset.documentNodeId)) {
+      debugger;
+    }
+
+
+    if (data.forceRerender) {
+      info.forceRerender = true;
+    }
+  };
+
+  for (let mutation of mutationList) {
+    if (mutation.type === "attributes") {
+      // For now, let's skip attribute changes
+    } else if (mutation.type === "childList") {
+      // Check if the mutation is for a document node or for a child of a document node
+      for (let additionNode of mutation.addedNodes) {
+        // If the added node is a document node, then add it to updatedOrAdded
+        // if it's a span, actually it's the same logic...
+        let documentNodeInfo = findDocumentNodeId(additionNode);
+
+        // If there is no document node associated with this, then decide if it's a new node
+        if (!documentNodeInfo.documentNode) {
+          let siblings = findPreviousAndNextSiblingDocumentNodeId(additionNode);
+
+          // Is it still part of the DOM?
+
+          if (!siblings.next && !siblings.prev) {
+            // debugger;
+            // If there's no siblings, then we don't know what this is... just force a rerender
+            // in this case I guess?
+            if (!additionNode.parentNode || (additionNode.dataset && additionNode.dataset.rteContainer)) {
+              continue;
+            }
+            info.forceRerender = true;
+          }
+          else {
+            // In this case, this appears to be a new added node
+            if (isExamined(additionNode)) {
+              continue;
+            }
+            processedDocumentNodes.push(additionNode);
+            addToUpdatedOrAdded(additionNode);
+          }
+        } else {
+          if (isExamined(documentNodeInfo.documentNode)) {
+            continue;
+          }
+          processedDocumentNodes.push(documentNodeInfo.documentNode);
+          addToUpdatedOrAdded(documentNodeInfo.documentNode);
+        }
+      }
+
+      // Check to see if the removed node is a document node.  If it is, check its siblings to make
+      // sure it doesn't have the same id of one that we need to remove. (?? maybe I should
+      // not use ids ??)
+      for (let removedNode of mutation.removedNodes) {
+        // If the removed node is a document node, then add it to removed nodes
+        if (removedNode.dataset && removedNode.dataset.documentNodeId) {
+          info.removed.push(removedNode.dataset.documentNodeId);
+          continue;
+        }
+
+        // If the removed node is a child of a document node, then add it to updatedOrAdded
+        let documentNodeInfo = findDocumentNodeId(removedNode);
+        if (!documentNodeInfo.documentNode) {
+          continue;
+        }
+        if (isExamined(documentNodeInfo.documentNode)) {
+          continue;
+        }
+
+        processedDocumentNodes.push(documentNodeInfo.documentNode);
+        addToUpdatedOrAdded(documentNodeInfo.documentNode);
+      }
+
+    } else if (mutation.type === "characterData") {
+      if (isComposing) {
+        continue;
+      }
+      let documentNodeInfo = findDocumentNodeId(mutation.target);
+
+      if (!documentNodeInfo.documentNode) {
+        // If this is a text change in a node that has no associated document node, then something
+        // is wrong...
+        continue;
+      }
+
+      if (isExamined(documentNodeInfo.documentNode)) {
+        continue;
+      }
+      processedDocumentNodes.push(documentNodeInfo.documentNode);
+      addToUpdatedOrAdded(documentNodeInfo.documentNode);
+    } else {
+      // What is this case???
+    }
+  }
+
+  let nodeIds = {};
+  for (let node of info.updatedOrAdded) {
+    nodeIds[node.id] = true;
+  }
+  info.removed = info.removed.filter((id) => !nodeIds[id]);
+  return info;
+};
+
 /**
  * This is a helper method that tries to figure out the text of a document node.
  */
-const deriveTextFromDocumentNode = (node) => {
+const deriveDataFromDocumentNode = (node) => {
+  if (!node) {
+    console.log("WTF node is null", node);
+    return {text: ""}
+  }
   if (node.nodeType === Node.TEXT_NODE) {
-    return (node.nodeValue || "")
+    return {text: (node.nodeValue || "")}
   }
 
   let value = "";
+  let offset = 0;
+  let offsetsAndMetadata = [];
+  let forceRerender = false;
+
   for (let childNode of node.childNodes) {
-    if (!childNode.dataset || !childNode.dataset.isEntity) {
-      value += deriveTextFromDocumentNode(childNode)
-    }
+      let {text} = deriveDataFromDocumentNode(childNode);
+
+      let characterMetadata = [];
+      if (childNode.dataset && childNode.dataset.characterMetadata) {
+        characterMetadata = childNode.dataset.characterMetadata.split(",");
+      }
+      let offsetAndMetadata = {range: {start: offset, end: offset + text.length}, metadata: characterMetadata};
+      offsetsAndMetadata.push(offsetAndMetadata);
+      offset += text.length;
+      value += text
   }
-  return value;
+
+  return {forceRerender, text: value, offsetsAndMetadata, nodeType: (node.dataset && node.dataset.documentNodeType || "") };
 };
 
 /**
@@ -214,41 +401,30 @@ document.addEventListener("compositionend", (e) => {
   isComposing = false;
 });
 
-document.addEventListener("input", (e) => {
-  if (isComposing) {
-    return;
-  }
-  let selection = window.getSelection();
-  // If something happens on input, then we need to get the selection anchor node and derive what
-  // the new text is.  This usually means that an autocomplete or spellcheck action occurred.
-  // Since we really don't know what the difference is, we'll pass the new text to the editor and let
-  // it resolve the difference.  Note that this probably will result in loss of style information since
-  // the browser mangles the spans inside a document node, so it's unreliable to pass that information
-  // to the editor.  However, there's definitely a way to do this so we lose *less* style information,
-  // since this will currently wipe out the entire block's style attributes.
+const findPreviousAndNextSiblingDocumentNodeId = (documentNode) => {
+  // TODO: find the previous sibling document node if it exists
+  let node = documentNode.previousSibling;
 
-  if (!e.target || !e.target.dataset || !e.target.dataset.documentId) {
-    return;
-  }
-
-  if (!selection || !selection.anchorNode) {
-    return;
-  }
-  registerObserver(e.target);
-
-  const anchorNode = findDocumentNodeId(selection.anchorNode);
-  let node = selectDocumentNodeById(anchorNode.id);
-  if (!node) {
-    return;
-  }
-  let text = deriveTextFromDocumentNode(node);
-  let event = new CustomEvent("documentnodechange", {
-    detail: {
-      node: anchorNode.id, text: text
+  let prev = null, next = null;
+  while (node) {
+    if (node.dataset && node.dataset.documentNodeId) {
+      prev = node.dataset.documentNodeId;
+      break;
     }
-  });
-  e.target.dispatchEvent(event);
-});
+    node = documentNode.previousSibling;
+  }
+
+  node = documentNode.nextSibling;
+  while (node) {
+    if (node.dataset && node.dataset.documentNodeId) {
+      next = node.dataset.documentNodeId;
+      break;
+    }
+    node = documentNode.nextSibling
+  }
+
+  return {prev, next};
+};
 
 // Firefox does not support beforeinput, so let's create a synthetic beforeinput event
 const IS_FIREFOX = typeof InstallTrigger !== 'undefined';
@@ -267,7 +443,7 @@ if (IS_FIREFOX) {
         });
         let cancelled = node.dispatchEvent(event);
         if (cancelled) {
-          e.preventDefault()
+          // e.preventDefault()
         }
         break;
       }
@@ -275,28 +451,3 @@ if (IS_FIREFOX) {
     }
   });
 }
-
-
-// ---
-// HACK: Sometimes, a text node will be inserted at very beginning of the contenteditable
-// and the VirtualDOM implementation in Elm doesn't validate that the previous DOM state is the same
-// as what it thought it was before, so it'll constantly throw an exception as it tries to re-render.
-
-// This observer tries to fix this by scanning the editor on every change and remove any top level text
-// nodes if they exist.
-const observers = {};
-const registerObserver = (node) => {
-  if (node && node.dataset && node.dataset.documentId && !observers[node.dataset.documentId]) {
-    const config = { attributes: true, childList: true, subtree: true };
-    const callback = function(mutationsList, observer) {
-      for (let childNode of node.childNodes) {
-        if (childNode.nodeType === Node.TEXT_NODE) {
-          childNode.remove();
-        }
-      }
-    };
-    const observer = new MutationObserver(callback);
-    observer.observe(node, config);
-    observers[node.dataset.documentId] = observer;
-  }
-};

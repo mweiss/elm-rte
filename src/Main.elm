@@ -352,28 +352,30 @@ renderDocument : Document -> Html Msg
 renderDocument document =
     div
         [ class "rte-container" ]
-        [ Html.Keyed.node "div"
-            [ contenteditable True
-            , doOnBlur
-            , onBeforeInput
-            , HandleKeyDown.onKeyDown
-            , onInput
-            , class "rte-main"
-            , onCompositionEnd
-            , onCopy
-            , onDrag
-            , onDrop
-            , onDocumentNodeChange
-            , onPaste
-            , onCut
-            , onPasteWithData
-            , onCompositionStart
-            , attribute "data-rte" "true"
-            , attribute "autocorrect" "off"
-            , attribute "spellcheck" "false"
-            , attribute "data-document-id" document.id
-            ]
-            [ ( String.fromInt document.renderCount, div [] (List.map renderDocumentNodeToHtml document.nodes) )
+        [ node "elm-editor"
+            [ onDocumentNodeChange ]
+            [ Html.Keyed.node "div"
+                [ contenteditable True
+                , doOnBlur
+                , onBeforeInput
+                , HandleKeyDown.onKeyDown
+                , onInput
+                , class "rte-main"
+                , onCompositionEnd
+                , onCopy
+                , onDrag
+                , onDrop
+                , onPaste
+                , onCut
+                , onPasteWithData
+                , onCompositionStart
+                , attribute "data-rte" "true"
+                , attribute "autocorrect" "off"
+                , attribute "spellcheck" "false"
+                , attribute "data-document-id" document.id
+                ]
+                [ ( String.fromInt document.renderCount, div [ attribute "data-rte-container" "true" ] (List.map renderDocumentNodeToHtml document.nodes) )
+                ]
             ]
         , node "selection-state" (selectionAttributesIfPresent document) []
         ]

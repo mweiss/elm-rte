@@ -807,6 +807,11 @@ insertAtSelection value document =
             newDocument
 
 
+addIdToNode : DocumentNode -> Document -> ( DocumentNode, Document )
+addIdToNode node document =
+    ( addIdToDocumentNode document.id 0 document.idCounter node, { document | idCounter = document.idCounter + 1 } )
+
+
 addIdToDocumentNode : String -> Int -> Int -> DocumentNode -> DocumentNode
 addIdToDocumentNode documentId start increment documentNode =
     { documentNode | id = documentId ++ "-" ++ String.fromInt (start + increment + 1) }
