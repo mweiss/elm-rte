@@ -175,6 +175,12 @@ type alias DocumentNodeChange =
     }
 
 
+type alias CompositionEnd =
+    { data : String
+    , isTrusted : Bool
+    }
+
+
 type Msg
     = OnBeforeInput InputEvent
     | Init
@@ -192,7 +198,7 @@ type Msg
     | OnPaste
     | OnSelect -- not implemented
     | OnKeyDown Keypress
-    | OnCompositionEnd String
+    | OnCompositionEnd CompositionEnd
     | Noop
     | SelectionEvent E.Value
     | OnButtonPress String

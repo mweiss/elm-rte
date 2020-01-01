@@ -23,7 +23,7 @@ import Html.Keyed
 import Json.Decode as D
 import Json.Encode as E
 import List exposing (repeat)
-import Model exposing (CharacterMetadata, CharacterStyle, Document, DocumentNode, Keypress, Msg(..), PasteWithData, Selection, emptyCharacterMetadata)
+import Model exposing (CharacterMetadata, CharacterStyle, CompositionEnd, Document, DocumentNode, Keypress, Msg(..), PasteWithData, Selection, emptyCharacterMetadata)
 import Random
 import Set exposing (Set)
 import String exposing (length)
@@ -96,12 +96,23 @@ onInput =
     Html.Events.onInput OnInput
 
 
-compositionEndDecoder =
-    D.at [ "data" ] (D.map OnCompositionEnd D.string)
+compositionEndFlagDecoder =
+    D.map OnCompositionEnd
+        (D.map2
+            CompositionEnd
+            (D.at
+                [ "detail", "data" ]
+                D.string
+            )
+            (D.at
+                [ "detail", "isTrusted" ]
+                D.bool
+            )
+        )
 
 
 onCompositionEnd =
-    on "compositionend" compositionEndDecoder
+    on "compositionendflag" compositionEndFlagDecoder
 
 
 onCompositionStart =
@@ -138,7 +149,11 @@ updateOnSelection selectionValue model =
                 ( model, Cmd.none )
 
             Ok s ->
-                ( { model | selection = Just s }, Cmd.none )
+                ( { model
+                    | selection = Just s
+                  }
+                , Cmd.none
+                )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -175,8 +190,8 @@ update msg model =
         OnCompositionStart ->
             handleCompositionStart model
 
-        OnCompositionEnd s ->
-            handleCompositionEnd s model
+        OnCompositionEnd v ->
+            handleCompositionEnd v model
 
         OnInput v ->
             ( model, Cmd.none )
@@ -370,8 +385,6 @@ renderDocument document =
                 , onPasteWithData
                 , onCompositionStart
                 , attribute "data-rte" "true"
-                , attribute "autocorrect" "off"
-                , attribute "spellcheck" "false"
                 , attribute "data-document-id" document.id
                 ]
                 [ ( String.fromInt document.renderCount, div [ attribute "data-rte-container" "true" ] (List.map renderDocumentNodeToHtml document.nodes) )

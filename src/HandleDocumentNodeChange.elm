@@ -173,9 +173,6 @@ forceRerender document =
 handleDocumentNodeChange : DocumentNodeChange -> Document -> Document
 handleDocumentNodeChange documentNodeChange document =
     let
-        debugStatement =
-            Debug.log "handleDocumentNodeChange" (List.map (\x -> x.id) document.nodes)
-
         removedNodesDocument =
             removeNodes documentNodeChange.removed document
 
@@ -188,8 +185,5 @@ handleDocumentNodeChange documentNodeChange document =
 
             else
                 addAndUpdateNodesDocument
-
-        debugStatement2 =
-            Debug.log "handleDocumentNodeChange 2" (List.map (\x -> x.id) forceRerenderDocument.nodes)
     in
     forceRerenderDocument

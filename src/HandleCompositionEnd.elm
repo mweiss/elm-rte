@@ -5,7 +5,7 @@ module HandleCompositionEnd exposing (..)
 -}
 
 import DocumentUtils exposing (insertAtSelection)
-import Model exposing (Document, Msg)
+import Model exposing (CompositionEnd, Document, Msg)
 
 
 
@@ -14,10 +14,10 @@ import Model exposing (Document, Msg)
 -}
 
 
-handleCompositionEnd : String -> Document -> ( Document, Cmd Msg )
-handleCompositionEnd data model =
-    let
-        newDoc =
-            insertAtSelection data model
-    in
-    ( { newDoc | isComposing = False }, Cmd.none )
+handleCompositionEnd : CompositionEnd -> Document -> ( Document, Cmd Msg )
+handleCompositionEnd compositionEnd model =
+    --let
+    -- newDoc =
+    --    insertAtSelection compositionEnd.data model
+    -- in
+    ( { model | isComposing = False }, Cmd.none )

@@ -6,14 +6,12 @@ import * as serviceWorker from './serviceWorker';
 class ElmEditor extends HTMLElement {
   constructor() {
     super();
-
+    this.savedMutations = [];
     this._observer = new MutationObserver(this.mutationObserverCallback.bind(this))
   }
 
-  mutationObserverCallback(mutationsList, observer) {
-
+  determineDocumentNodeChange(mutationsList) {
     let changes = gatherInformationFromMutations(mutationsList);
-    console.log('mutationObserverCallback', mutationsList, changes);
     if (changes.updatedOrAdded.length === 0 &&
         !changes.forceRerender &&
         changes.removed.length === 0) {
@@ -22,14 +20,46 @@ class ElmEditor extends HTMLElement {
     let event = new CustomEvent("documentnodechange", {
       detail: changes
     });
-    this.dispatchEvent(event)
+    this.dispatchEvent(event);
+  }
 
+  mutationObserverCallback(mutationsList, observer) {
+    if (isComposing) {
+      this.savedMutations = this.savedMutations.concat(mutationsList);
+      return;
+    }
+    this.determineDocumentNodeChange(mutationsList)
   }
 
   connectedCallback() {
     this._observer.observe(this, { characterDataOldValue: true, attributeOldValue: true, attributes: true, childList: true, subtree: true, characterData: true })
+    // okay, we're going to attach a bunch of events for debugging android
+    /*
+        let logCallback = (event) => ((e) => console.log(event, e));
+    this.childNodes[0].addEventListener("beforeinput", logCallback("beforeinput"));
+    this.childNodes[0].addEventListener("input", logCallback("input"));
+    this.childNodes[0].addEventListener("keydown", logCallback("keydown"));
+    this.childNodes[0].addEventListener("keypress", logCallback("keypress"));
+    this.childNodes[0].addEventListener("compositionstart", logCallback("compositionstart"));
+     */
+    this.childNodes[0].addEventListener("compositionend", this.applyMutations.bind(this));
   }
 
+  applyMutations() {
+    setTimeout(() => {
+      let mutations = this.savedMutations;
+      this.savedMutations = [];
+      this.determineDocumentNodeChange(mutations);
+      let event = new CustomEvent("compositionendflag", {
+        detail: {
+          data: "",
+          isTrusted: false
+        }
+      })
+      this.childNodes[0].dispatchEvent(event);
+      updateToCurrentSelection(false, true);
+    }, 20)
+  }
   disconnectedCallback() {
     this._observer.disconnect();
   }
@@ -172,19 +202,31 @@ const findDocumentNodeId = (node) => {
  * the selection so that it matches the Elm's DocumentNode model.
  */
 document.addEventListener("selectionchange", (e) => {
+  updateToCurrentSelection(true)
+});
+
+let rangeCounter = 1000000;
+
+let updateToCurrentSelection = (ignoreInvalidSelection, force=false) => {
   const selection = getSelection();
   const anchorNode = findDocumentNodeId(selection.anchorNode);
   const focusNode = findDocumentNodeId(selection.focusNode);
-  app.ports.updateSelection.send({
+
+  if (!ignoreInvalidSelection && !(anchorNode.id && focusNode)) {
+    return;
+  }
+
+  let data = {
     "anchorOffset": selection.anchorOffset + anchorNode.offset,
     "focusOffset": selection.focusOffset + focusNode.offset,
     "isCollapsed": selection.isCollapsed,
-    "rangeCount": selection.rangeCount,
+    "rangeCount": force ? rangeCounter++ : selection.rangeCount, // HACK: TODO, come up with a real way to force the selection
     "type": selection.type,
     "anchorNode": anchorNode.id,
-    "focusNode": focusNode.id
-  });
-});
+    "focusNode": focusNode.id,
+  };
+  app.ports.updateSelection.send(data);
+};
 
 /**
  * The paste event only allows us to access the clipboard when we're handling the event, which means
@@ -237,10 +279,26 @@ const gatherInformationFromMutations = (mutationList) => {
     return false;
   };
 
+  const validDocumentNode = (documentNode) => {
+    // assert the document node has an id, its children are only spans and those spans all have only one child, a text node
+    if (!documentNode.dataset || !documentNode.dataset.documentNodeId) {
+      return false;
+    }
+
+    for (let childNode of documentNode.childNodes) {
+      if (childNode.tagName !== "SPAN" || documentNode.childNodes.length === 2 && childNode.tagName === "BR") {
+        return false
+      }
+      if (childNode.childNodes.length !== 1 || childNode.childNodes[0].nodeType !== Node.TEXT_NODE) {
+        return false
+      }
+    }
+    return documentNode.childNodes.length > 0;
+  };
+
   const addToUpdatedOrAdded = (documentNode) => {
     let data = deriveDataFromDocumentNode(documentNode);
     let siblings = findPreviousAndNextSiblingDocumentNodeId(documentNode);
-
     info.updatedOrAdded.push({
       id: (documentNode.dataset && documentNode.dataset.documentNodeId) || "",
       text: data.text,
@@ -249,12 +307,8 @@ const gatherInformationFromMutations = (mutationList) => {
       nodeType: data.nodeType
     });
 
-    if (!(documentNode.dataset && documentNode.dataset.documentNodeId)) {
-      debugger;
-    }
-
-
-    if (data.forceRerender) {
+    if (! isComposing && (data.forceRerender || !validDocumentNode(documentNode))) {
+      console.log('invalid node', documentNode);
       info.forceRerender = true;
     }
   };
@@ -325,9 +379,6 @@ const gatherInformationFromMutations = (mutationList) => {
       }
 
     } else if (mutation.type === "characterData") {
-      if (isComposing) {
-        continue;
-      }
       let documentNodeInfo = findDocumentNodeId(mutation.target);
 
       if (!documentNodeInfo.documentNode) {
@@ -358,10 +409,6 @@ const gatherInformationFromMutations = (mutationList) => {
  * This is a helper method that tries to figure out the text of a document node.
  */
 const deriveDataFromDocumentNode = (node) => {
-  if (!node) {
-    console.log("WTF node is null", node);
-    return {text: ""}
-  }
   if (node.nodeType === Node.TEXT_NODE) {
     return {text: (node.nodeValue || "")}
   }
@@ -371,8 +418,12 @@ const deriveDataFromDocumentNode = (node) => {
   let offsetsAndMetadata = [];
   let forceRerender = false;
 
+  let hasSpan = false;
+
   for (let childNode of node.childNodes) {
       let {text} = deriveDataFromDocumentNode(childNode);
+
+      hasSpan = hasSpan || childNode.tagName === "SPAN";
 
       let characterMetadata = [];
       if (childNode.dataset && childNode.dataset.characterMetadata) {
